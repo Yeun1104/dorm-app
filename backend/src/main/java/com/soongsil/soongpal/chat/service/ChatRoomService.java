@@ -146,10 +146,17 @@ public class ChatRoomService {
                 .map(id -> "chat:room:" + id + ":last-message")
                 .toList();
 
-        List<String> cachedValues = redisTemplate.opsForValue().multiGet(keys);
-
         Map<Long, LastMessageDto> lastMessageMap = new java.util.HashMap<>();
         List<Long> missedIds = new java.util.ArrayList<>();
+
+        // Redis에서 캐시된 마지막 메시지 조회 시도. Redis가 없거나(로컬 개발 등) 접속 실패해도
+        // 전체가 캐시 미스로 처리되어 DB에서 직접 조회하도록 폴백된다 (서비스 자체는 끊기지 않음).
+        List<String> cachedValues = null;
+        try {
+            cachedValues = redisTemplate.opsForValue().multiGet(keys);
+        } catch (Exception e) {
+            log.warn("Redis 조회 실패 - DB 폴백으로 처리 ({}건): {}", roomIds.size(), e.getMessage());
+        }
 
         for (int i = 0; i < roomIds.size(); i++) {
             String json = cachedValues != null ? cachedValues.get(i) : null;
@@ -214,7 +221,7 @@ public class ChatRoomService {
 
         ChatRoom findChatRoom = chatRoomRepository.findByBoardId(boardId)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_NOT_FOUND));
-        
+
         if (findChatRoom.getType() == PRIVATE) {
             throw new ChatException(ChatErrorCode.CHAT_ROOM_ACCESS_DENIED);
         }

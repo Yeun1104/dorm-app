@@ -12,6 +12,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -19,7 +20,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class S3Uploader {
 
-    private final S3Client s3Client;
+    // S3 기능이 꺼져있으면(app.feature.s3.enabled=false) S3Client 빈이 아예 없음.
+    // Optional로 받아서 없으면 업로드/삭제를 조용히 스킵 (게시글 작성 자체는 막지 않음, 이미지만 안 붙음).
+    private final Optional<S3Client> s3ClientProvider;
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
@@ -29,6 +32,11 @@ public class S3Uploader {
 
     public String uploadFile(MultipartFile multipartFile, String dirName) {
         if (multipartFile.isEmpty()) {
+            return null;
+        }
+
+        if (s3ClientProvider.isEmpty()) {
+            log.warn("S3 비활성화 상태 - 이미지 업로드 스킵 (dirName={}, 파일명={})", dirName, multipartFile.getOriginalFilename());
             return null;
         }
 
@@ -47,7 +55,7 @@ public class S3Uploader {
                     .build();
 
             // 파일 스트림을 S3에 업로드
-            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(multipartFile.getInputStream(), multipartFile.getSize()));
+            s3ClientProvider.get().putObject(putObjectRequest, RequestBody.fromInputStream(multipartFile.getInputStream(), multipartFile.getSize()));
 
             // 업로드된 파일의 S3 URL 반환
             return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + fileName;
@@ -63,6 +71,11 @@ public class S3Uploader {
             return;
         }
 
+        if (s3ClientProvider.isEmpty()) {
+            log.warn("S3 비활성화 상태 - 이미지 삭제 스킵 ({})", fileUrl);
+            return;
+        }
+
         String key = fileUrl.substring(fileUrl.indexOf(".com/") + 5);
 
         try {
@@ -73,7 +86,7 @@ public class S3Uploader {
                     .build();
 
             // S3에서 파일 삭제 실행
-            s3Client.deleteObject(deleteObjectRequest);
+            s3ClientProvider.get().deleteObject(deleteObjectRequest);
             log.info("S3 파일 삭제 성공: {}", key);
         } catch (S3Exception e) {
             log.error("S3 파일 삭제 실패: {}", e.getMessage());
