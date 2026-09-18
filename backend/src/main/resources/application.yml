@@ -5,7 +5,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/soongpal?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root1234}
+    password: ${DB_PASSWORD:1234}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -47,6 +47,8 @@ spring:
       max-request-size: 50MB
 
 # ===== JWT =====
+# secret은 서버가 토큰에 서명/검증할 때 쓰는 "비밀키"임. 발급된 토큰 자체를 여기 넣는 게 아니라,
+# 이 키로 서버가 토큰을 만들고, 나중에 그 토큰이 진짜 우리 서버가 만든 게 맞는지 검증함.
 jwt:
   secret: ${JWT_SECRET:Q0GxVWZGQ0jTPsEUzR8L+4HlJ57tbe7HjfUxaqzB1kgUrzzZn1SqIiHJEdEG6xgbkGSZ6zKYj4AxCWfWdoSE8A==}
   access-token-validity-in-milliseconds: ${JWT_ACCESS_VALIDITY:3600000}         # 1시간
