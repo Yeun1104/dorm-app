@@ -32,6 +32,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
     }
 
+    @ExceptionHandler(DormException.class)
+    public ResponseEntity<CommonErrorDto> handleDormException(DormException e) {
+        log.error("[exceptionHandle] DormException", e);
+        return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
+    }
+
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<CommonErrorDto> SecurityExceptionHandler (SecurityException e) {

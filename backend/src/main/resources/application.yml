@@ -64,12 +64,16 @@ app:
   cookie:
     domain: ${APP_COOKIE_DOMAIN:localhost}
     secure: ${APP_COOKIE_SECURE:false}
-  # 로컬 개발 단계에서 끄고 싶은 외부 연동 기능 스위치
+  # 로컬 개발 단계에서 끄고 싶은(혹은 켜고 싶은) 기능 스위치
   feature:
     firebase:
       enabled: ${FEATURE_FIREBASE_ENABLED:false}
     s3:
       enabled: ${FEATURE_S3_ENABLED:false}
+    # ⚠️ 카카오 로그인 없이 테스트 JWT 바로 발급받는 개발용 API 스위치.
+    # 로컬 기본값은 true. 배포 환경에서는 반드시 false로 바꿔야 함 (안 그러면 인증 우회 가능한 보안 구멍).
+    dev-tools:
+      enabled: ${FEATURE_DEV_TOOLS_ENABLED:true}
 
 # ===== Firebase (feature.firebase.enabled=true일 때만 사용됨) =====
 firebase:
@@ -86,6 +90,15 @@ cloud:
       static: ${AWS_REGION:ap-northeast-2}
     s3:
       bucket: ${AWS_S3_BUCKET:dummy-bucket}
+
+# ===== 숭실대 기숙사(ssudorm) 연동 =====
+# base-url 뒤에 :444 포트까지 포함해서 씀. 개인 테스트 단계라 계정당 1개(자기 자신)만 저장/사용.
+dorm:
+  base-url: ${DORM_BASE_URL:https://ssudorm.ssu.ac.kr:444}
+  credential:
+    # 기숙사 계정 아이디/비번을 DB에 암호화해서 저장할 때 쓰는 AES-256 키 (32바이트, base64)
+    # 로컬 개발 기본값이 박혀있지만, 실사용자를 받는 순간 반드시 실제 운영키로 교체해야 함
+    secret-key: ${DORM_CREDENTIAL_SECRET_KEY:hjFNS/oyBqQO6rrHUlPxy/PYWNx8GxHdaFcqYCSrDK4=}
 
 springdoc:
   swagger-ui:
