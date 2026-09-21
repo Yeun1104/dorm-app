@@ -79,7 +79,8 @@ public class DormSessionManager {
 
     /**
      * 캐싱된 세션으로 지정 경로(path)를 GET해서 Document로 돌려줌.
-     * 세션이 없거나 만료됐으면 전달받은 자격증명으로 자동 재로그인 후 1회 재시도함.
+     * GET은 여러 번 호출해도 안전(idempotent)하기 때문에, 세션이 없거나 만료됐으면
+     * 자동 재로그인 후 1회 재시도함.
      *
      * @param path "/SShostel/..." 형태의 base-url 뒤 경로 (쿼리스트링 포함 가능)
      */
@@ -98,7 +99,7 @@ public class DormSessionManager {
                     .execute();
 
             if (!containsLogoutMarker(res.body())) {
-                // 세션 만료로 추정 -> 재로그인 후 1회만 재시도
+                // 세션 만료로 추정 -> 재로그인 후 1회만 재시도 (GET은 반복 호출해도 부작용 없음)
                 log.info("기숙사 세션 만료로 추정, 재로그인 시도 (userId={})", userId);
                 cookies = login(userId, dormUsername, dormPassword);
 
@@ -118,7 +119,14 @@ public class DormSessionManager {
     }
 
     /**
-     * 캐싱된 세션으로 지정 경로에 폼 데이터를 POST함. 세션 만료 시 재로그인 후 1회 재시도.
+     * 캐싱된 세션으로 지정 경로에 폼 데이터를 POST함.
+     *
+     * ⚠️ GET과 달리 여기서는 "응답에 로그아웃 마커가 없으면 재로그인 후 재시도"를 하지 않음.
+     * POST는 글쓰기처럼 부작용(side effect)이 있는 요청이라, 응답 페이지 판별을 잘못해서 재시도하면
+     * 똑같은 내용이 두 번 등록되는 중복 제출 사고로 이어짐 (실제로 겪은 버그).
+     * 그래서 세션이 아예 없을 때만(캐시가 비어있을 때만) 로그인하고, 있으면 그대로 1번만 제출함.
+     * 세션이 진짜로 만료된 상태에서 POST하면 ssudorm이 로그인 폼을 돌려줄 텐데, 그 경우는 호출부(서비스)의
+     * 제출 후 확인 로직(confirmSubmission)에서 "목록에 없음 = 실패"로 잡히게 되어있음.
      */
     public Document postAuthenticated(Long userId, String path, Map<String, String> formData,
                                        String dormUsername, String dormPassword) {
@@ -137,20 +145,6 @@ public class DormSessionManager {
                     .followRedirects(true)
                     .timeout(10_000)
                     .execute();
-
-            if (!containsLogoutMarker(res.body())) {
-                log.info("기숙사 세션 만료로 추정, 재로그인 후 재시도 (userId={}, path={})", userId, path);
-                cookies = login(userId, dormUsername, dormPassword);
-
-                res = Jsoup.connect(baseUrl + path)
-                        .cookies(cookies)
-                        .data(formData)
-                        .postDataCharset("EUC-KR")
-                        .method(Connection.Method.POST)
-                        .followRedirects(true)
-                        .timeout(10_000)
-                        .execute();
-            }
 
             return res.parse();
 
