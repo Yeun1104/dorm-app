@@ -5,6 +5,8 @@ import com.soongsil.soongpal.board.domain.BoardStatus;
 import com.soongsil.soongpal.board.repository.BoardRepository;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
+import com.soongsil.soongpal.manner.dto.MannerBadgeDto;
+import com.soongsil.soongpal.manner.service.MannerReviewService;
 import com.soongsil.soongpal.reservation.domain.ReservationStatus;
 import com.soongsil.soongpal.reservation.repository.ReservationRepository;
 import com.soongsil.soongpal.user.domain.User;
@@ -14,16 +16,18 @@ import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
 
+    private static final int TOP_BADGE_COUNT = 3;
+
     private final UserRepository userRepository;
     private final BoardRepository boardRepository;
     private final ReservationRepository reservationRepository;
+    private final MannerReviewService mannerReviewService;
 
     public ProfileResDto getProfile(Long targetUserId) {
         User user = userRepository.findById(targetUserId)
@@ -44,11 +48,13 @@ public class ProfileService {
         long completedAsBuyer = reservationRepository.countByBuyerIdAndStatus(targetUserId, ReservationStatus.COMPLETED);
         long completedAsSeller = reservationRepository.countByBoard_UserIdAndStatus(targetUserId, ReservationStatus.COMPLETED);
 
+        List<MannerBadgeDto> topBadges = mannerReviewService.getTopBadges(targetUserId, TOP_BADGE_COUNT);
+
         return ProfileResDto.builder()
                 .userId(user.getId())
                 .nickname(user.getNickName())
                 .tradeCount((int) (completedAsBuyer + completedAsSeller))
-                .mannerKeywords(Collections.emptyList()) // 매너배지 아직 없음
+                .topMannerBadges(topBadges)
                 .inProgressBoards(inProgressBoards)
                 .completedBoards(completedBoards)
                 .build();

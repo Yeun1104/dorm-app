@@ -50,6 +50,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
     }
 
+    @ExceptionHandler(MannerReviewException.class)
+    public ResponseEntity<CommonErrorDto> handleMannerReviewException(MannerReviewException e) {
+        log.error("[exceptionHandle] MannerReviewException", e);
+        return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
+    }
+
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<CommonErrorDto> SecurityExceptionHandler (SecurityException e) {
