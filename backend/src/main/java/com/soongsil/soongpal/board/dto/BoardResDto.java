@@ -17,7 +17,13 @@ public class BoardResDto {
     private Long id;
     private String title;
     private String content;
-    private Integer price;
+
+    private Integer totalPrice;
+    private Integer totalQuantity;
+    private Integer minPurchaseQuantity;
+    private Integer unitPrice;       // 자동 계산 (올림)
+    private Integer remainingQuantity; // 자동 계산 (totalQuantity - 예약(IN_PROGRESS/COMPLETED) 합계)
+
     private String url;
     private String location;
     private BoardCategory category;
@@ -30,12 +36,16 @@ public class BoardResDto {
     private Integer likeCount;
     private boolean liked;
 
-    public static BoardResDto from(Board board, Integer likeCount, boolean liked) {
+    public static BoardResDto from(Board board, Integer likeCount, boolean liked, Integer remainingQuantity) {
         return BoardResDto.builder()
                 .id(board.getId())
                 .title(board.getTitle())
                 .content(board.getContent())
-                .price(board.getPrice())
+                .totalPrice(board.getTotalPrice())
+                .totalQuantity(board.getTotalQuantity())
+                .minPurchaseQuantity(board.getMinPurchaseQuantity())
+                .unitPrice(board.getUnitPrice())
+                .remainingQuantity(remainingQuantity)
                 .url(board.getUrl())
                 .location(board.getLocation())
                 .category(board.getCategory())

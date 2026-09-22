@@ -12,6 +12,8 @@ import com.soongsil.soongpal.chat.repository.ChatMessageRepository;
 import com.soongsil.soongpal.chat.repository.ChatRoomRepository;
 import com.soongsil.soongpal.chat.repository.ChatRoomUserRepository;
 import com.soongsil.soongpal.common.exception.ChatException;
+import com.soongsil.soongpal.common.exception.UserErrorCode;
+import com.soongsil.soongpal.common.exception.UserException;
 import com.soongsil.soongpal.user.domain.User;
 import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +49,10 @@ public class ChatService {
                 .orElseThrow(() -> new ChatException(USER_NOT_FOUND));
         if (sender.getDeletedAt() != null) {
             throw new ChatException(USER_NOT_FOUND);
+        }
+        // 신고 누적으로 정지/블라인드/영구정지된 계정은 채팅 전송 자체를 막음
+        if (sender.isCurrentlyRestricted()) {
+            throw new UserException(UserErrorCode.USER_SUSPENDED);
         }
 
         chatRoomUserRepository.findByChatRoomIdAndUserId(chatRoom.getId(), userId)

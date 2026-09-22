@@ -25,17 +25,27 @@ public class BoardCreateReqDto {
     @NotBlank
     private String content;
 
-    @Schema(description = "판매 상품 가격", example = "12000")
+    @Schema(description = "전체 결제 금액 (배송비 포함)", example = "15000")
     @NotNull
-    @Min(value = 0)
-    private Integer price;
+    @Min(value = 1)
+    private Integer totalPrice;
+
+    @Schema(description = "전체 상품 개수 (= 공구로 판매할 개수)", example = "30")
+    @NotNull
+    @Min(value = 1)
+    private Integer totalQuantity;
+
+    @Schema(description = "1인당 최소 구매 수량 (선택 사항, 없으면 1개부터)", example = "2")
+    @Min(value = 1)
+    private Integer minPurchaseQuantity;
 
     @Schema(description = "상품 관련 URL (선택 사항)", example = "https://example.com/cola")
     private String url;
-    @Schema(description = "모임 장소 또는 거래 위치 (선택 사항)", example = "기숙사 1층 로비")
+
+    @Schema(description = "수령 장소 (선택 사항)", example = "기숙사 1층 로비")
     private String location;
 
-    @Schema(description = "게시글 카테고리 상태", example = "GROUP", allowableValues = {"GROUP"})
+    @Schema(description = "게시글 카테고리", example = "GROUP", allowableValues = {"GROUP"})
     @NotNull
     private BoardCategory category;
 
@@ -43,7 +53,9 @@ public class BoardCreateReqDto {
         return Board.builder()
                 .title(boardCreateReqDto.getTitle())
                 .content(boardCreateReqDto.getContent())
-                .price(boardCreateReqDto.getPrice())
+                .totalPrice(boardCreateReqDto.getTotalPrice())
+                .totalQuantity(boardCreateReqDto.getTotalQuantity())
+                .minPurchaseQuantity(boardCreateReqDto.getMinPurchaseQuantity())
                 .url(boardCreateReqDto.getUrl())
                 .location(boardCreateReqDto.getLocation())
                 .category(boardCreateReqDto.getCategory())

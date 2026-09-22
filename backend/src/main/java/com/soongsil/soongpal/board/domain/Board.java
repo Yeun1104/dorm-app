@@ -29,7 +29,18 @@ public class Board extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    private Integer price;
+    // ===== 공동구매 가격/수량 (요구사항: 전체결제금액 + 전체상품개수를 입력받고, 개당가격/판매개수는 자동 계산) =====
+
+    /** 전체 결제 금액 (배송비 포함) */
+    @Column(nullable = false)
+    private Integer totalPrice;
+
+    /** 전체 상품 개수 (= 공구로 판매할 개수) */
+    @Column(nullable = false)
+    private Integer totalQuantity;
+
+    /** 1인당 최소 구매 수량 (선택 사항, 없으면 제한 없음=1개부터) */
+    private Integer minPurchaseQuantity;
 
     @Lob
     @Column(columnDefinition = "TEXT")
@@ -70,7 +81,9 @@ public class Board extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
         this.status = BoardStatus.DELETED;
         this.url = null;
-        this.price = null;
+        this.totalPrice = null;
+        this.totalQuantity = null;
+        this.minPurchaseQuantity = null;
         this.location = null;
     }
 
@@ -83,11 +96,13 @@ public class Board extends BaseEntity {
         this.boardImages.removeIf(image -> image.getId().equals(imageId));
     }
 
-    public void update(String title, String content, Integer price, String url, String location,
-                       BoardCategory category) {
+    public void update(String title, String content, Integer totalPrice, Integer totalQuantity,
+                        Integer minPurchaseQuantity, String url, String location, BoardCategory category) {
         this.title = title;
         this.content = content;
-        this.price = price;
+        this.totalPrice = totalPrice;
+        this.totalQuantity = totalQuantity;
+        this.minPurchaseQuantity = minPurchaseQuantity;
         this.url = url;
         this.location = location;
         this.category = category;
@@ -95,5 +110,13 @@ public class Board extends BaseEntity {
 
     public void updateStatus(BoardStatus status) {
         this.status = status;
+    }
+
+    /** 개당 가격. 딱 안 떨어지면 무조건 올림. */
+    public int getUnitPrice() {
+        if (totalPrice == null || totalQuantity == null || totalQuantity <= 0) {
+            return 0;
+        }
+        return (int) Math.ceil((double) totalPrice / totalQuantity);
     }
 }

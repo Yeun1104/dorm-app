@@ -38,6 +38,18 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
     }
 
+    @ExceptionHandler(ReportException.class)
+    public ResponseEntity<CommonErrorDto> handleReportException(ReportException e) {
+        log.error("[exceptionHandle] ReportException", e);
+        return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
+    }
+
+    @ExceptionHandler(ReservationException.class)
+    public ResponseEntity<CommonErrorDto> handleReservationException(ReservationException e) {
+        log.error("[exceptionHandle] ReservationException", e);
+        return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
+    }
+
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<CommonErrorDto> SecurityExceptionHandler (SecurityException e) {

@@ -12,6 +12,7 @@ import com.soongsil.soongpal.user.service.jwt.JwtTokenProvider;
 import com.soongsil.soongpal.user.domain.User;
 import com.soongsil.soongpal.user.dto.*;
 import com.soongsil.soongpal.user.repository.UserRepository;
+import com.soongsil.soongpal.user.util.NicknameValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -48,6 +49,7 @@ public class AuthService {
         }
         OAuthAttributes attributes = jwtTokenProvider.getAttributesFromTempToken(tempToken);
 
+        NicknameValidator.validate(nickname);
         if (userRepository.findByNickName(nickname).isPresent()) {
             throw new UserException(UserErrorCode.USER_ALREADY_EXISTS);
         }
@@ -109,6 +111,7 @@ public class AuthService {
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
         String newNickname = updateRequestDto.getNickname();
+        NicknameValidator.validate(newNickname);
         if (userRepository.findByNickName(newNickname).isPresent()) {
             throw new UserException(UserErrorCode.USER_ALREADY_EXISTS);
         }
