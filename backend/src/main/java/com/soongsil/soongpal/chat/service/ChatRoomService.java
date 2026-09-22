@@ -2,7 +2,6 @@ package com.soongsil.soongpal.chat.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soongsil.soongpal.board.domain.Board;
-import com.soongsil.soongpal.board.domain.BoardCategory;
 import com.soongsil.soongpal.board.repository.BoardRepository;
 import com.soongsil.soongpal.chat.domain.ChatMessage;
 import com.soongsil.soongpal.chat.domain.ChatRole;
@@ -37,6 +36,11 @@ import java.util.stream.Collectors;
 import static com.soongsil.soongpal.chat.domain.ChatRoomType.GROUP;
 import static com.soongsil.soongpal.chat.domain.ChatRoomType.PRIVATE;
 
+/**
+ * ⚠️ 리팩터링 예정: GROUP(단체) 채팅방 생성/참가(createGroupChatRoom, joinChatRoom)는
+ * 공동구매도 1:1 채팅으로 바뀌면서 더 이상 필요 없어질 가능성이 높음 — 아직 지우지 않고 남겨둠
+ * (사용처 정리는 BoardService.createBoard 쪽 변경과 같이 논의하고 나서 처리하기로 함).
+ */
 @Slf4j
 @Transactional
 @Service
@@ -132,9 +136,6 @@ public class ChatRoomService {
         String lastContent = lastMessage != null ? lastMessage.getContent() : null;
         LocalDateTime lastCreatedAt = lastMessage != null ? lastMessage.getCreatedAt() : chatRoom.getCreatedAt();
 
-        if (findBoard.getCategory() == BoardCategory.USED) {
-            return ChatRoomResDto.of(chatRoom, findBoard.getUser().getNickName(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
-        }
         return ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
     }
 
@@ -205,9 +206,6 @@ public class ChatRoomService {
                             String lastContent = lastMessage != null ? lastMessage.content() : null;
                             LocalDateTime lastCreatedAt = lastMessage != null ? lastMessage.createdAt() : c.getCreatedAt();
 
-                            if (findBoard.getCategory() == BoardCategory.USED) {
-                                return ChatRoomResDto.of(c, findBoard.getUser().getNickName(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
-                            }
                             return ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
                         })
                 )

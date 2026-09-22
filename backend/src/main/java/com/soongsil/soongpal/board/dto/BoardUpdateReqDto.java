@@ -37,7 +37,7 @@ public class BoardUpdateReqDto {
     @Schema(description = "수정할 모임 장소 또는 거래 위치 (선택 사항)", example = "숭실대학교 한경직 기념관")
     private String location;
 
-    @Schema(description = "수정할 게시글 상태", example = "USED", allowableValues = {"GROUP", "USED"})
+    @Schema(description = "수정할 게시글 상태", example = "GROUP", allowableValues = {"GROUP"})
     @NotNull
     private BoardCategory category;
 }

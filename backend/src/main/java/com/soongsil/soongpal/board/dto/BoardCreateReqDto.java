@@ -35,7 +35,7 @@ public class BoardCreateReqDto {
     @Schema(description = "모임 장소 또는 거래 위치 (선택 사항)", example = "기숙사 1층 로비")
     private String location;
 
-    @Schema(description = "게시글 카테고리 상태", example = "GROUP", allowableValues = {"GROUP", "USED"})
+    @Schema(description = "게시글 카테고리 상태", example = "GROUP", allowableValues = {"GROUP"})
     @NotNull
     private BoardCategory category;
 
