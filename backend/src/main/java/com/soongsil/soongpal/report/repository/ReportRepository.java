@@ -1,6 +1,7 @@
 package com.soongsil.soongpal.report.repository;
 
 import com.soongsil.soongpal.report.domain.Report;
+import com.soongsil.soongpal.report.domain.ReportCategory;
 import com.soongsil.soongpal.report.domain.ReportStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,4 +19,7 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     @Query("select count(distinct r.reporter.id) from Report r " +
             "where r.reportedUser.id = :reportedUserId and r.createdAt >= :since")
     long countDistinctReportersSince(@Param("reportedUserId") Long reportedUserId, @Param("since") LocalDateTime since);
+
+    /** 특정 카테고리(예: 노쇼)로, 관리자가 실제 조치(RESOLVED)한 신고 건수. 방장이 참여요청 목록에서 리스크 판단용으로 참고함. */
+    long countByReportedUserIdAndCategoryAndStatus(Long reportedUserId, ReportCategory category, ReportStatus status);
 }

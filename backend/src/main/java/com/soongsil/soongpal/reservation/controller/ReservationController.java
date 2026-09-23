@@ -21,12 +21,12 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "Reservation Controller", description = "공동구매 수량 예약(구매신청) API")
+@Tag(name = "Reservation Controller", description = "공동구매 참여요청(예약) API — 요청 → 방장 수락/거절 → (수락시) 1:1채팅+수량차감 순서")
 public class ReservationController {
 
     private final ReservationService reservationService;
 
-    @Operation(summary = "구매 신청", description = "수량을 입력해서 구매를 신청함. 1:1 채팅방이 같이 생성됨(이미 신청한 적 있으면 기존 걸 그대로 돌려줌). 이 시점엔 아직 수량이 차감되지 않음.")
+    @Operation(summary = "참여 요청 (API 1)", description = "수량을 입력해서 참여를 요청함. 이 시점엔 채팅방도 안 생기고 수량도 차감 안 됨 — 방장 확인 대기 상태(PENDING)가 됨.")
     @PostMapping("/api/board/{boardId}/reservations")
     public ResponseEntity<CommonResDto<ReservationResDto>> createReservation(
             @PathVariable Long boardId,
@@ -34,10 +34,11 @@ public class ReservationController {
     ) {
         Long userId = getUserId();
         ReservationResDto result = reservationService.createReservation(userId, boardId, dto);
-        return new ResponseEntity<>(new CommonResDto<>("구매 신청이 접수되었습니다.", result), HttpStatus.OK);
+        return new ResponseEntity<>(new CommonResDto<>("참여 요청이 접수되었습니다.", result), HttpStatus.OK);
     }
 
-    @Operation(summary = "예약 상태 변경 (방장 전용)", description = "IN_PROGRESS(거래중, 이때부터 수량 차감)/COMPLETED(거래완료)/CANCELLED(취소, 수량 복구)")
+    @Operation(summary = "참여 요청 수락/거절/상태변경 (API 3, 방장 전용)",
+            description = "PENDING → ACCEPTED(수락, 이때 1:1채팅 생성+수량차감) 또는 REJECTED(거절). ACCEPTED → COMPLETED(거래완료) 또는 CANCELLED(취소, 수량복구).")
     @PatchMapping("/api/reservations/{reservationId}/status")
     public ResponseEntity<CommonResDto<ReservationResDto>> updateStatus(
             @PathVariable Long reservationId,
@@ -48,19 +49,21 @@ public class ReservationController {
         return new ResponseEntity<>(new CommonResDto<>("예약 상태가 변경되었습니다.", result), HttpStatus.OK);
     }
 
-    @Operation(summary = "게시글별 예약 목록 조회 (방장 확인용)", description = "누가 얼마나 신청했는지 목록. 방장이든 누구든 지금은 다 볼 수 있음 — 방장 전용으로 막을지는 추후 논의.")
+    @Operation(summary = "참여 요청 목록 조회 (API 2, 방장 전용)",
+            description = "신청자 프로필(거래횟수/노쇼 신고이력)과 신청 수량이 같이 내려옴. 게시글 작성자만 조회 가능.")
     @GetMapping("/api/board/{boardId}/reservations")
     public ResponseEntity<CommonResDto<List<ReservationResDto>>> getReservationsByBoard(@PathVariable Long boardId) {
-        List<ReservationResDto> result = reservationService.getReservationsByBoard(boardId);
-        return new ResponseEntity<>(new CommonResDto<>("예약 목록 조회 성공", result), HttpStatus.OK);
+        Long userId = getUserId();
+        List<ReservationResDto> result = reservationService.getReservationsByBoard(userId, boardId);
+        return new ResponseEntity<>(new CommonResDto<>("참여 요청 목록 조회 성공", result), HttpStatus.OK);
     }
 
-    @Operation(summary = "내 구매 신청 목록 조회")
+    @Operation(summary = "내 참여 요청 목록 조회")
     @GetMapping("/api/reservations/mine")
     public ResponseEntity<CommonResDto<List<ReservationResDto>>> getMyReservations() {
         Long userId = getUserId();
         List<ReservationResDto> result = reservationService.getMyReservations(userId);
-        return new ResponseEntity<>(new CommonResDto<>("내 구매 신청 목록 조회 성공", result), HttpStatus.OK);
+        return new ResponseEntity<>(new CommonResDto<>("내 참여 요청 목록 조회 성공", result), HttpStatus.OK);
     }
 
     private Long getUserId() {

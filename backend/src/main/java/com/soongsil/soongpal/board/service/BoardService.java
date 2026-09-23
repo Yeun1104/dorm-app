@@ -10,6 +10,7 @@ import com.soongsil.soongpal.common.exception.BoardException;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
 import com.soongsil.soongpal.common.file.S3Uploader;
+import com.soongsil.soongpal.reservation.domain.ReservationStatus;
 import com.soongsil.soongpal.reservation.repository.ReservationRepository;
 import com.soongsil.soongpal.user.domain.User;
 import com.soongsil.soongpal.user.repository.UserRepository;
@@ -78,17 +79,15 @@ public class BoardService {
         }
 
         // ⚠️ 예전엔 여기서 GROUP 카테고리면 단체채팅방을 자동으로 열었는데, 이제 공동구매도 1:1 채팅만 쓰기로 해서
-        // 글쓰기 시점엔 채팅방을 안 만듦. 구매자가 ReservationController로 "구매 신청"할 때 1:1 채팅방이 생김.
-        return BoardResDto.from(board, 0, false, savedBoard.getTotalQuantity());
+        // 글쓰기 시점엔 채팅방을 안 만듦. 구매자가 참여요청을 보내고, 방장이 수락해야 1:1 채팅방이 생김.
+        return BoardResDto.from(board, 0, false, savedBoard.getTotalQuantity(), 0);
     }
 
     public BoardResDto getBoardById(Long id, Long userId) {
         Board findBoard = boardRepository.findById(id)
                 .orElseThrow(() -> new BoardException(BoardErrorCode.BOARD_NOT_FOUND));
 
-        Integer likeCount = likeRepository.countByBoardId(findBoard.getId());
-        boolean liked = likeRepository.existsByBoardIdAndUserId(findBoard.getId(), userId);
-        return BoardResDto.from(findBoard, likeCount, liked, calculateRemainingQuantity(findBoard));
+        return toBoardResDto(findBoard, userId);
     }
 
     @Transactional
@@ -149,9 +148,7 @@ public class BoardService {
             }
         }
 
-        Integer likeCount = likeRepository.countByBoardId(findBoard.getId());
-        boolean liked = likeRepository.existsByBoardIdAndUserId(findBoard.getId(), userId);
-        return BoardResDto.from(findBoard, likeCount, liked, calculateRemainingQuantity(findBoard));
+        return toBoardResDto(findBoard, userId);
     }
 
     @Transactional
@@ -167,9 +164,7 @@ public class BoardService {
 
         findBoard.updateStatus(statusUpdateDto.getStatus());
 
-        Integer likeCount = likeRepository.countByBoardId(findBoard.getId());
-        boolean liked = likeRepository.existsByBoardIdAndUserId(findBoard.getId(), userId);
-        return BoardResDto.from(findBoard, likeCount, liked, calculateRemainingQuantity(findBoard));
+        return toBoardResDto(findBoard, userId);
     }
 
     @Transactional
@@ -208,12 +203,7 @@ public class BoardService {
             boardsPage = boardRepository.findAll(pageable);
         }
 
-        Page<BoardResDto> boardPageResDto = boardsPage.map(board -> BoardResDto.from(
-                board,
-                likeRepository.countByBoardId(board.getId()),
-                likeRepository.existsByBoardIdAndUserId(board.getId(), userId),
-                calculateRemainingQuantity(board)
-        ));
+        Page<BoardResDto> boardPageResDto = boardsPage.map(board -> toBoardResDto(board, userId));
         return BoardPageResDto.from(boardPageResDto);
     }
 
@@ -256,6 +246,14 @@ public class BoardService {
     private User getUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+    }
+
+    private BoardResDto toBoardResDto(Board board, Long userId) {
+        Integer likeCount = likeRepository.countByBoardId(board.getId());
+        boolean liked = likeRepository.existsByBoardIdAndUserId(board.getId(), userId);
+        Integer remaining = calculateRemainingQuantity(board);
+        Integer waitingCount = (int) reservationRepository.countByBoardIdAndStatus(board.getId(), ReservationStatus.PENDING);
+        return BoardResDto.from(board, likeCount, liked, remaining, waitingCount);
     }
 
     private Integer calculateRemainingQuantity(Board board) {

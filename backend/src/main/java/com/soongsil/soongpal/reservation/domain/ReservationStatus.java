@@ -1,8 +1,9 @@
 package com.soongsil.soongpal.reservation.domain;
 
 public enum ReservationStatus {
-    PENDING,      // 구매자가 수량 입력하고 채팅 시작한 상태. 아직 수량 게이지 차감 안 됨.
-    IN_PROGRESS,  // 방장이 "이 사람과 거래중"으로 확정. 이때부터 수량 게이지에서 차감됨.
-    COMPLETED,    // 거래 완료 (게이지는 계속 차감된 채로 유지)
-    CANCELLED     // 방장 또는 구매자가 취소. 게이지 차감됐었다면 복구됨.
+    PENDING,    // 구매자가 참여 요청. 아직 채팅방 없음, 수량 게이지도 안 깎임 (방장 확인 대기).
+    ACCEPTED,   // 방장이 수락. 이 시점에 1:1 채팅방 생성 + 수량 게이지 차감이 같이 일어남.
+    REJECTED,   // 방장이 거절. 종료 상태 (채팅/차감 없음).
+    COMPLETED,  // 거래 완료.
+    CANCELLED   // 수락 이후 취소. 게이지 복구됨.
 }

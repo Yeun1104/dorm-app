@@ -10,8 +10,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 공동구매 게시글에 대한 구매자의 수량 예약 건.
- * 채팅방 하나당 예약 하나 (구매자가 "구매하기" 누르면 1:1 채팅방 + 예약이 같이 생김).
+ * 공동구매 게시글에 대한 구매자의 참여 요청/예약 건.
+ * 채팅방은 요청 시점이 아니라 "방장이 수락한 시점"에 생김 (방장 피로도/노쇼 리스크 방지).
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -30,6 +30,7 @@ public class Reservation extends BaseEntity {
     @JoinColumn(name = "buyer_id", nullable = false)
     private User buyer;
 
+    // 요청 시점엔 null. 방장이 수락하는 순간 채팅방이 생기면서 채워짐.
     @Column(name = "chat_room_id")
     private Long chatRoomId;
 
@@ -41,16 +42,21 @@ public class Reservation extends BaseEntity {
     private ReservationStatus status;
 
     @Builder
-    public Reservation(Board board, User buyer, Long chatRoomId, Integer quantity) {
+    public Reservation(Board board, User buyer, Integer quantity) {
         this.board = board;
         this.buyer = buyer;
-        this.chatRoomId = chatRoomId;
         this.quantity = quantity;
         this.status = ReservationStatus.PENDING;
     }
 
-    public void markInProgress() {
-        this.status = ReservationStatus.IN_PROGRESS;
+    /** 방장이 수락. 이때 채팅방이 같이 생기므로 chatRoomId를 같이 채워줌. */
+    public void accept(Long chatRoomId) {
+        this.chatRoomId = chatRoomId;
+        this.status = ReservationStatus.ACCEPTED;
+    }
+
+    public void reject() {
+        this.status = ReservationStatus.REJECTED;
     }
 
     public void markCompleted() {
@@ -61,8 +67,8 @@ public class Reservation extends BaseEntity {
         this.status = ReservationStatus.CANCELLED;
     }
 
-    /** 수량 게이지에 실제로 잡혀있는 상태인지 (IN_PROGRESS 또는 COMPLETED). */
+    /** 수량 게이지에 실제로 잡혀있는 상태인지 (ACCEPTED 또는 COMPLETED). */
     public boolean isHoldingQuantity() {
-        return status == ReservationStatus.IN_PROGRESS || status == ReservationStatus.COMPLETED;
+        return status == ReservationStatus.ACCEPTED || status == ReservationStatus.COMPLETED;
     }
 }

@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ReservationStatusUpdateReqDto {
 
-    @Schema(description = "변경할 상태", allowableValues = {"IN_PROGRESS", "COMPLETED", "CANCELLED"})
+    @Schema(description = "변경할 상태. PENDING 상태에서는 ACCEPTED/REJECTED만, ACCEPTED 상태에서는 COMPLETED/CANCELLED만 가능.",
+            allowableValues = {"ACCEPTED", "REJECTED", "COMPLETED", "CANCELLED"})
     @NotNull
     private ReservationStatus status;
 }
