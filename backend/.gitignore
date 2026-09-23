@@ -41,6 +41,7 @@ out/
 ### Mac OS ###
 .DS_Store
 
-*.yaml
-*.yml
+### Secrets (실제 키가 든 로컬 전용 파일만 제외, application.yml 본체는 이제 커밋함) ###
+application-secret.yml
+.env
 **/*firebase*adminsdk*.json

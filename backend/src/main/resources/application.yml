@@ -1,0 +1,109 @@
+spring:
+  application:
+    name: soongpal
+
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/soongpal?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:true}
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID:dummy-client-id}
+            client-secret: ${KAKAO_CLIENT_SECRET:dummy-client-secret}
+            redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/login/oauth2/code/kakao}
+            authorization-grant-type: authorization_code
+            client-authentication-method: client_secret_post
+            scope: profile_nickname, account_email
+            client-name: Kakao
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+# ===== JWT =====
+# secret은 서버가 토큰에 서명/검증할 때 쓰는 "비밀키"임. 발급된 토큰 자체를 여기 넣는 게 아니라,
+# 이 키로 서버가 토큰을 만들고, 나중에 그 토큰이 진짜 우리 서버가 만든 게 맞는지 검증함.
+jwt:
+  secret: ${JWT_SECRET:Q0GxVWZGQ0jTPsEUzR8L+4HlJ57tbe7HjfUxaqzB1kgUrzzZn1SqIiHJEdEG6xgbkGSZ6zKYj4AxCWfWdoSE8A==}
+  access-token-validity-in-milliseconds: ${JWT_ACCESS_VALIDITY:3600000}         # 1시간
+  refresh-token-validity-in-milliseconds: ${JWT_REFRESH_VALIDITY:1209600000}    # 14일
+  temp-token-validity-in-milliseconds: ${JWT_TEMP_VALIDITY:600000}             # 10분
+
+# ===== 카카오 연결끊기(회원탈퇴)용 어드민 키 =====
+kakao-admin:
+  key: ${KAKAO_ADMIN_KEY:dummy-admin-key}
+
+# ===== 앱 자체 설정 =====
+app:
+  oauth2:
+    authorized-redirect-uri: ${APP_REDIRECT_URI:http://localhost:3000}
+  cookie:
+    domain: ${APP_COOKIE_DOMAIN:localhost}
+    secure: ${APP_COOKIE_SECURE:false}
+  # 로컬 개발 단계에서 끄고 싶은(혹은 켜고 싶은) 기능 스위치
+  feature:
+    firebase:
+      enabled: ${FEATURE_FIREBASE_ENABLED:false}
+    s3:
+      enabled: ${FEATURE_S3_ENABLED:false}
+    # ⚠️ 카카오 로그인 없이 테스트 JWT 바로 발급받는 개발용 API 스위치.
+    # 로컬 기본값은 true. 배포 환경에서는 반드시 false로 바꿔야 함 (안 그러면 인증 우회 가능한 보안 구멍).
+    dev-tools:
+      enabled: ${FEATURE_DEV_TOOLS_ENABLED:true}
+
+# ===== Firebase (feature.firebase.enabled=true일 때만 사용됨) =====
+firebase:
+  config:
+    path: ${FIREBASE_CONFIG_PATH:firebase/firebase-adminsdk.json}
+
+# ===== AWS S3 (feature.s3.enabled=true일 때만 사용됨) =====
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY:dummy}
+      secret-key: ${AWS_SECRET_KEY:dummy}
+    region:
+      static: ${AWS_REGION:ap-northeast-2}
+    s3:
+      bucket: ${AWS_S3_BUCKET:dummy-bucket}
+
+# ===== 숭실대 기숙사(ssudorm) 연동 =====
+# base-url 뒤에 :444 포트까지 포함해서 씀. 개인 테스트 단계라 계정당 1개(자기 자신)만 저장/사용.
+dorm:
+  base-url: ${DORM_BASE_URL:https://ssudorm.ssu.ac.kr:444}
+  credential:
+    # 기숙사 계정 아이디/비번을 DB에 암호화해서 저장할 때 쓰는 AES-256 키 (32바이트, base64)
+    # 로컬 개발 기본값이 박혀있지만, 실사용자를 받는 순간 반드시 실제 운영키로 교체해야 함
+    secret-key: ${DORM_CREDENTIAL_SECRET_KEY:hjFNS/oyBqQO6rrHUlPxy/PYWNx8GxHdaFcqYCSrDK4=}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
