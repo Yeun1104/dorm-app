@@ -37,6 +37,14 @@ public class ReservationController {
         return new ResponseEntity<>(new CommonResDto<>("참여 요청이 접수되었습니다.", result), HttpStatus.OK);
     }
 
+    @Operation(summary = "참여 요청 철회 (구매자 전용)", description = "본인이 보낸 참여 요청을 스스로 취소함. 방장이 아직 수락/거절하기 전(PENDING)에만 가능.")
+    @DeleteMapping("/api/reservations/{reservationId}")
+    public ResponseEntity<CommonResDto<Void>> withdrawReservation(@PathVariable Long reservationId) {
+        Long userId = getUserId();
+        reservationService.withdrawByBuyer(userId, reservationId);
+        return new ResponseEntity<>(new CommonResDto<>("참여 요청을 취소했습니다.", null), HttpStatus.OK);
+    }
+
     @Operation(summary = "참여 요청 수락/거절/상태변경 (API 3, 방장 전용)",
             description = "PENDING → ACCEPTED(수락, 이때 1:1채팅 생성+수량차감) 또는 REJECTED(거절). ACCEPTED → COMPLETED(거래완료) 또는 CANCELLED(취소, 수량복구).")
     @PatchMapping("/api/reservations/{reservationId}/status")

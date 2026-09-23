@@ -31,6 +31,7 @@ import java.util.List;
  *    → ACCEPTED(방장이 신청자 프로필 보고 수락 — 이 순간 1:1 채팅방 생성 + 게이지 차감이 같이 일어남)
  *      → COMPLETED(거래 완료) 또는 CANCELLED(취소, 게이지 복구)
  *    → REJECTED(방장이 거절 — 종료, 채팅/차감 없음)
+ *    → CANCELLED(구매자가 PENDING 상태일 때 스스로 요청을 철회 — 방장 처리 전에만 가능)
  *
  * 게이지(남은 수량)는 그때그때 ACCEPTED+COMPLETED 예약 수량 합을 쿼리로 계산함(별도 카운터 컬럼 없음).
  * ⚠️ 동시에 여러 건을 동시에 수락하는 동시성 문제까지는 아직 막지 않음(초기 버전 한계).
@@ -86,6 +87,27 @@ public class ReservationService {
         reservationRepository.save(reservation);
 
         return ReservationResDto.from(reservation);
+    }
+
+    /**
+     * 구매자가 본인이 보낸 참여 요청을 스스로 철회함. PENDING 상태일 때만 가능
+     * (방장이 이미 수락/거절 처리했으면 취소 불가 — 그 이후엔 방장한테 요청해서 CANCELLED로 처리해야 함).
+     * PENDING은 애초에 수량 게이지에 안 잡혀있는 상태라 별도 복구 로직은 필요 없음.
+     */
+    @Transactional
+    public void withdrawByBuyer(Long buyerId, Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+        if (!reservation.getBuyer().getId().equals(buyerId)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_BUYER_ONLY);
+        }
+
+        if (reservation.getStatus() != ReservationStatus.PENDING) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_ALREADY_PROCESSED);
+        }
+
+        reservation.cancel();
     }
 
     /**
