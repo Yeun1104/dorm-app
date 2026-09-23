@@ -59,6 +59,10 @@ public class ReservationService {
         if (buyer.isCurrentlyRestricted()) {
             throw new UserException(UserErrorCode.USER_SUSPENDED);
         }
+        // 학교 계정(usaint) 인증된 사용자만 구매 신청 가능
+        if (!buyer.isSchoolVerified()) {
+            throw new UserException(UserErrorCode.SCHOOL_VERIFICATION_REQUIRED);
+        }
 
         // 이미 이 게시글에 대해 진행 중인 예약이 있으면 그걸 그대로 돌려줌 (중복 생성 방지)
         List<ReservationStatus> activeStatuses = List.of(ReservationStatus.PENDING, ReservationStatus.IN_PROGRESS);

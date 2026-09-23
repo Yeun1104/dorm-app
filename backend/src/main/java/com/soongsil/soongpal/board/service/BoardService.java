@@ -55,6 +55,10 @@ public class BoardService {
         if (findUser.isCurrentlyRestricted()) {
             throw new UserException(UserErrorCode.USER_SUSPENDED);
         }
+        // 학교 계정(usaint) 인증된 사용자만 글쓰기 가능
+        if (!findUser.isSchoolVerified()) {
+            throw new UserException(UserErrorCode.SCHOOL_VERIFICATION_REQUIRED);
+        }
 
         Board board = BoardCreateReqDto.toEntity(boardCreateReqDto, findUser);
         Board savedBoard = boardRepository.save(board);

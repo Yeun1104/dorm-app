@@ -25,4 +25,12 @@ public class AdminController {
         adminService.deletePostByAdmin(boardId);
         return new ResponseEntity<>(new CommonResDto<>("게시글 강제 삭제 성공", null), HttpStatus.OK);
     }
+
+    @PatchMapping("/users/{userId}/verify-school")
+    @ApiResponse(responseCode = "200", description = "학교 인증 수동 처리 성공")
+    @Operation(summary = "[임시] 학교 계정 인증 수동 처리", description = "usaint 연동 전까지 관리자가 수동으로 학교 인증 여부를 true로 바꿔주는 임시 API.")
+    public ResponseEntity<CommonResDto<Void>> verifySchoolAccount(@PathVariable Long userId) {
+        adminService.verifySchoolAccount(userId);
+        return new ResponseEntity<>(new CommonResDto<>("학교 인증 처리 완료", null), HttpStatus.OK);
+    }
 }

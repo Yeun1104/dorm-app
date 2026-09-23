@@ -18,7 +18,7 @@ public class AuthController {
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Operation(summary = "최종 회원가입", description = "임시 토큰과 닉네임을 받아 최종 회원가입을 처리합니다.")
+    @Operation(summary = "최종 회원가입", description = "카카오 로그인 후 받은 임시 토큰과 닉네임을 받아 최종 회원가입을 처리합니다.")
     @PostMapping("/register")
     public ResponseEntity<AuthResponseDto> register(
             @RequestHeader("Authorization") String tempToken,

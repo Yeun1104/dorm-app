@@ -12,8 +12,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -34,9 +32,10 @@ public class SecurityConfig {
                     .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(authorize -> authorize
-                    // 기숙사 계정(아이디/비번 등록, 로그인 대행) API는 반드시 로그인한 사용자만 접근 가능해야 해서
-                    // 아래의 광범위한 "/**" permitAll보다 먼저(우선순위 높게) 명시함.
+                    // ⚠️ 아래의 광범위한 "/**" permitAll보다 먼저(우선순위 높게) 와야 하는 규칙들.
+                    // Spring Security는 먼저 매치되는 규칙을 적용하기 때문에, 순서가 바뀌면 이 규칙들이 무력화됨.
                     .requestMatchers("/api/dorm/**").authenticated()
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .requestMatchers(
                             "/",
                             "/error",
@@ -51,7 +50,6 @@ public class SecurityConfig {
                             "/**"
                     ).permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/board/**").permitAll()
-                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
@@ -61,10 +59,5 @@ public class SecurityConfig {
             .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }
