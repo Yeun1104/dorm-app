@@ -20,6 +20,7 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
     @Query(value = """
             SELECT
                 cm.chat_room_id AS roomId,
+                cm.id AS messageId,
                 cm.content AS content,
                 cm.created_at AS createdAt
             FROM chat_messages cm

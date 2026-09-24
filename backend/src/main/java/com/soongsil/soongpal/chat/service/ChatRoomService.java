@@ -38,8 +38,7 @@ import static com.soongsil.soongpal.chat.domain.ChatRoomType.PRIVATE;
 
 /**
  * ⚠️ 리팩터링 예정: GROUP(단체) 채팅방 생성/참가(createGroupChatRoom, joinChatRoom)는
- * 공동구매도 1:1 채팅으로 바뀌면서 더 이상 필요 없어질 가능성이 높음 — 아직 지우지 않고 남겨둠
- * (사용처 정리는 BoardService.createBoard 쪽 변경과 같이 논의하고 나서 처리하기로 함).
+ * 공동구매도 1:1 채팅으로 바뀌면서 지금은 안 쓰이지만, 사전공구 등 나중을 위해 일단 남겨둠.
  */
 @Slf4j
 @Transactional
@@ -134,9 +133,13 @@ public class ChatRoomService {
 
         ChatMessage lastMessage = chatMessageRepository.findLastMessageByRoomId(chatRoom.getId()).orElse(null);
         String lastContent = lastMessage != null ? lastMessage.getContent() : null;
+        Long lastMessageId = lastMessage != null ? lastMessage.getId() : null;
         LocalDateTime lastCreatedAt = lastMessage != null ? lastMessage.getCreatedAt() : chatRoom.getCreatedAt();
 
-        return ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
+        Integer unreadCount = calculateUnreadCount(roomId, userId);
+
+        return ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
+                users, lastContent, lastMessageId, lastCreatedAt, unreadCount);
     }
 
     public List<ChatRoomResDto> getChatRoomsByUser(Long userId) {
@@ -204,13 +207,26 @@ public class ChatRoomService {
 
                             LastMessageDto lastMessage = lastMessageMap.get(c.getId());
                             String lastContent = lastMessage != null ? lastMessage.content() : null;
+                            Long lastMessageId = lastMessage != null ? lastMessage.messageId() : null;
                             LocalDateTime lastCreatedAt = lastMessage != null ? lastMessage.createdAt() : c.getCreatedAt();
 
-                            return ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
+                            Integer unreadCount = calculateUnreadCount(c.getId(), userId);
+
+                            return ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
+                                    users, lastContent, lastMessageId, lastCreatedAt, unreadCount);
                         })
                 )
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    /** 이 방에서 내가 안 보낸(=상대가 보낸) 메시지 중, 내가 마지막으로 읽은 메시지보다 나중에 온 것들의 개수. */
+    private Integer calculateUnreadCount(Long roomId, Long userId) {
+        Long lastReadMessageId = chatRoomUserRepository.findByChatRoomIdAndUserId(roomId, userId)
+                .map(ChatRoomUser::getLastReadMessageId)
+                .orElse(null);
+        long sinceId = lastReadMessageId != null ? lastReadMessageId : 0L;
+        return (int) chatMessageRepository.countByChatRoom_IdAndIdGreaterThanAndSender_IdNot(roomId, sinceId, userId);
     }
 
     public ChatRoomResDto joinChatRoom(Long boardId, Long userId) {
@@ -289,6 +305,6 @@ public class ChatRoomService {
     }
 
     private LastMessageDto toLastMessageDto(LastMessageProjection projection) {
-        return new LastMessageDto(projection.getRoomId(), projection.getContent(), projection.getCreatedAt());
+        return new LastMessageDto(projection.getRoomId(), projection.getMessageId(), projection.getContent(), projection.getCreatedAt());
     }
 }

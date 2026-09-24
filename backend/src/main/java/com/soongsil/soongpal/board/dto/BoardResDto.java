@@ -30,6 +30,7 @@ public class BoardResDto {
     private BoardCategory category;
     private BoardStatus status;
 
+    private Long authorId;
     private String authorNickname;
     private LocalDateTime createdAt;
     private List<BoardImageDto> images;
@@ -54,6 +55,7 @@ public class BoardResDto {
                 .status(board.getStatus())
                 .likeCount(likeCount)
                 .liked(liked)
+                .authorId(board.getUser().getId())
                 .authorNickname(board.getUser().getNickName())
                 .createdAt(board.getCreatedAt())
                 .images(board.getBoardImages().stream()
