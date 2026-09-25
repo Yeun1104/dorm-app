@@ -1,12 +1,14 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { boardApi, LocalImage } from '../../api/board';
 import { errorMessage } from '../../api/client';
 import { useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { Button, Field, FormScroll, Input, Screen, SubHeader, Thumb } from '../../components/ui';
+import { Button, ErrorView, Field, FormScroll, Input, LoadingView, Screen, SubHeader, Thumb } from '../../components/ui';
 import { MAX_BOARD_IMAGES } from '../../constants';
+import { invalidateBoard } from '../../hooks/useBoards';
+import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { won } from '../../utils/format';
@@ -16,9 +18,15 @@ const toInt = (s: string) => {
   return Number.isNaN(n) ? null : n;
 };
 
-export default function BoardWriteScreen({ navigation }: ScreenProps<'BoardWrite'>) {
+/** 수정 모드에서는 서버에 있는 기존 이미지(id 보유)와 새로 고른 로컬 이미지가 섞여 있음 */
+type FormImage = LocalImage & { id?: number };
+
+export default function BoardWriteScreen({ navigation, route }: ScreenProps<'BoardWrite'>) {
+  const editId = route.params?.boardId;
   const toast = useToast();
-  const [images, setImages] = useState<LocalImage[]>([]);
+  const original = useFetch(() => boardApi.detail(editId!), [editId], { enabled: editId != null });
+  const [images, setImages] = useState<FormImage[]>([]);
+  const [deleteImageIds, setDeleteImageIds] = useState<number[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [totalPrice, setTotalPrice] = useState('');
@@ -28,6 +36,28 @@ export default function BoardWriteScreen({ navigation }: ScreenProps<'BoardWrite
   const [url, setUrl] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // 수정 모드: 기존 값으로 폼 채우기 (최초 1회)
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    const b = original.data;
+    if (!b || prefilled) return;
+    setImages(b.images.map((img) => ({ id: img.id, uri: img.imageUrl })));
+    setTitle(b.title);
+    setContent(b.content);
+    setTotalPrice(String(b.totalPrice));
+    setTotalQuantity(String(b.totalQuantity));
+    setMinQty(b.minPurchaseQuantity != null ? String(b.minPurchaseQuantity) : '');
+    setLocation(b.location ?? '');
+    setUrl(b.url ?? '');
+    setPrefilled(true);
+  }, [original.data, prefilled]);
+
+  const removeImage = (index: number) => {
+    const target = images[index];
+    if (target?.id != null) setDeleteImageIds((prev) => [...prev, target.id!]);
+    setImages((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   const price = toInt(totalPrice);
   const qty = toInt(totalQuantity);
@@ -65,22 +95,27 @@ export default function BoardWriteScreen({ navigation }: ScreenProps<'BoardWrite
   const submit = async () => {
     if (!validate()) return;
     setSubmitting(true);
+    const body = {
+      title: title.trim(),
+      content: content.trim(),
+      totalPrice: price!,
+      totalQuantity: qty!,
+      minPurchaseQuantity: toInt(minQty) ?? undefined,
+      location: location.trim() || undefined,
+      url: url.trim() || undefined,
+      category: 'GROUP' as const,
+    };
     try {
-      const board = await boardApi.create(
-        {
-          title: title.trim(),
-          content: content.trim(),
-          totalPrice: price!,
-          totalQuantity: qty!,
-          minPurchaseQuantity: toInt(minQty) ?? undefined,
-          location: location.trim() || undefined,
-          url: url.trim() || undefined,
-          category: 'GROUP',
-        },
-        images,
-      );
-      toast('공동구매 글을 올렸어요');
-      navigation.replace('BoardDetail', { boardId: board.id });
+      if (editId != null) {
+        await boardApi.update(editId, body, images.filter((img) => img.id == null), deleteImageIds);
+        invalidateBoard(editId);
+        toast('게시글을 수정했어요');
+        navigation.goBack();
+      } else {
+        const board = await boardApi.create(body, images);
+        toast('공동구매 글을 올렸어요');
+        navigation.replace('BoardDetail', { boardId: board.id });
+      }
     } catch (e) {
       toast(errorMessage(e));
     } finally {
@@ -90,54 +125,60 @@ export default function BoardWriteScreen({ navigation }: ScreenProps<'BoardWrite
 
   return (
     <Screen bg="white" edges={['top', 'bottom']}>
-      <SubHeader title="공동구매 글쓰기" />
-      <FormScroll footer={<Button label="등록하기" onPress={submit} loading={submitting} />}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 9, paddingVertical: 4 }}>
-          <Pressable style={styles.addPhoto} onPress={pickImages}>
-            <Icon name="camera" color="#7e8985" />
-            <Text style={styles.addPhotoText}>{images.length}/{MAX_BOARD_IMAGES}</Text>
-          </Pressable>
-          {images.map((img, i) => (
-            <View key={img.uri}>
-              <Thumb uri={img.uri} size={74} />
-              <Pressable style={styles.removePhoto} onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))} hitSlop={6}>
-                <Icon name="close" size={12} color="white" strokeWidth={2.4} />
-              </Pressable>
+      <SubHeader title={editId != null ? '게시글 수정' : '공동구매 글쓰기'} />
+      {editId != null && original.loading && !original.data ? (
+        <LoadingView />
+      ) : editId != null && (original.error || !original.data) ? (
+        <ErrorView message={original.error ?? '게시글을 불러오지 못했어요'} onRetry={original.reload} />
+      ) : (
+        <FormScroll footer={<Button label={editId != null ? '수정하기' : '등록하기'} onPress={submit} loading={submitting} />}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 9, paddingVertical: 4 }}>
+            <Pressable style={styles.addPhoto} onPress={pickImages}>
+              <Icon name="camera" color="#7e8985" />
+              <Text style={styles.addPhotoText}>{images.length}/{MAX_BOARD_IMAGES}</Text>
+            </Pressable>
+            {images.map((img, i) => (
+              <View key={img.uri}>
+                <Thumb uri={img.uri} size={74} />
+                <Pressable style={styles.removePhoto} onPress={() => removeImage(i)} hitSlop={6}>
+                  <Icon name="close" size={12} color="white" strokeWidth={2.4} />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+
+          <Field label="제목" error={errors.title}>
+            <Input value={title} onChangeText={setTitle} placeholder="예) 진라면 매운맛 20개 같이 사요" maxLength={60} />
+          </Field>
+          <Field label="내용" error={errors.content}>
+            <Input value={content} onChangeText={setContent} multiline placeholder="상품 정보, 도착 예정일, 소분 방법 등을 적어주세요" />
+          </Field>
+          <Field label="전체 결제 금액" hint="배송비 포함 금액으로 입력해주세요" error={errors.totalPrice}>
+            <Input value={totalPrice} onChangeText={setTotalPrice} keyboardType="number-pad" placeholder="예) 13000" />
+          </Field>
+          <Field label="전체 상품 개수" error={errors.totalQuantity}>
+            <Input value={totalQuantity} onChangeText={setTotalQuantity} keyboardType="number-pad" placeholder="예) 20" />
+          </Field>
+
+          {unitPreview !== null && (
+            <View style={styles.preview}>
+              <Text style={styles.previewText}>
+                개당 <Text style={{ fontWeight: '800' }}>{won(unitPreview)}</Text>이에요!
+              </Text>
             </View>
-          ))}
-        </ScrollView>
+          )}
 
-        <Field label="제목" error={errors.title}>
-          <Input value={title} onChangeText={setTitle} placeholder="예) 진라면 매운맛 20개 같이 사요" maxLength={60} />
-        </Field>
-        <Field label="내용" error={errors.content}>
-          <Input value={content} onChangeText={setContent} multiline placeholder="상품 정보, 도착 예정일, 소분 방법 등을 적어주세요" />
-        </Field>
-        <Field label="전체 결제 금액" hint="배송비 포함 금액으로 입력해주세요" error={errors.totalPrice}>
-          <Input value={totalPrice} onChangeText={setTotalPrice} keyboardType="number-pad" placeholder="예) 13000" />
-        </Field>
-        <Field label="전체 상품 개수" error={errors.totalQuantity}>
-          <Input value={totalQuantity} onChangeText={setTotalQuantity} keyboardType="number-pad" placeholder="예) 20" />
-        </Field>
-
-        {unitPreview !== null && (
-          <View style={styles.preview}>
-            <Text style={styles.previewText}>
-              개당 <Text style={{ fontWeight: '800' }}>{won(unitPreview)}</Text>이에요!
-            </Text>
-          </View>
-        )}
-
-        <Field label="1인당 최소 구매 수량 (선택)" hint="비워두면 1개부터 참여할 수 있어요" error={errors.minQty}>
-          <Input value={minQty} onChangeText={setMinQty} keyboardType="number-pad" placeholder="1" />
-        </Field>
-        <Field label="수령 장소">
-          <Input value={location} onChangeText={setLocation} placeholder="예) 레지던스홀 1층 로비" />
-        </Field>
-        <Field label="상품 링크 (선택)">
-          <Input value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" />
-        </Field>
-      </FormScroll>
+          <Field label="1인당 최소 구매 수량 (선택)" hint="비워두면 1개부터 참여할 수 있어요" error={errors.minQty}>
+            <Input value={minQty} onChangeText={setMinQty} keyboardType="number-pad" placeholder="1" />
+          </Field>
+          <Field label="수령 장소">
+            <Input value={location} onChangeText={setLocation} placeholder="예) 레지던스홀 1층 로비" />
+          </Field>
+          <Field label="상품 링크 (선택)">
+            <Input value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" />
+          </Field>
+        </FormScroll>
+      )}
     </Screen>
   );
 }

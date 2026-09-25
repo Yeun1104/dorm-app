@@ -255,10 +255,12 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
             )}
           </View>
 
-          <View style={styles.safeNote}>
-            <Text style={styles.safeTitle}>안심하고 거래하세요</Text>
-            <Text style={styles.safeText}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
-          </View>
+          {!mine && (
+            <View style={styles.safeNote}>
+              <Text style={styles.safeTitle}>안심하고 거래하세요</Text>
+              <Text style={styles.safeText}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -280,6 +282,15 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
       </View>
       {menu && (
         <View style={[styles.menu, { top: insets.top + 58 }]}>
+          <Pressable
+            style={styles.menuItem}
+            onPress={() => {
+              setMenu(false);
+              navigation.navigate('BoardWrite', { boardId });
+            }}
+          >
+            <Text style={{ color: colors.text, fontSize: font.md }}>게시글 수정</Text>
+          </Pressable>
           <Pressable style={styles.menuItem} onPress={deleteBoard}>
             <Text style={{ color: colors.danger, fontSize: font.md }}>게시글 삭제</Text>
           </Pressable>

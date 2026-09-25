@@ -315,7 +315,13 @@ export interface NoticeDetail {
   viewCount: number;
   writtenAt: string;
   content: string;
+  /** 표/문단 구조가 유지된 본문 (구버전 서버면 없음 → content로 대체) */
+  blocks?: NoticeBlock[];
 }
+
+export type NoticeBlock =
+  | { type: 'TEXT'; text: string; rows: null }
+  | { type: 'TABLE'; text: null; rows: string[][] };
 
 export interface InquiryListItem {
   displayNo: number;

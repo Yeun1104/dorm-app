@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { errorMessage } from '../../api/client';
 import { inquiryApi, noticeApi, repairApi } from '../../api/dorm';
-import type { DormSearchField, InquiryListItem, NoticeListItem, RepairListItem } from '../../api/types';
+import type { DormSearchField, InquiryListItem, NoticeBlock, NoticeListItem, RepairListItem } from '../../api/types';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
 import {
@@ -37,7 +37,9 @@ const META: Record<Kind, { title: string; subtitle: string; empty: string }> = {
 const listFn = { repair: repairApi.list, notice: noticeApi.list, inquiry: inquiryApi.list };
 
 /** 작성자 판별: 상세의 writer가 폼 기본값(내 기숙사 프로필 이름)과 같으면 본인 글 */
-const isMine = (writer: string | undefined, myName: string | undefined) => !!writer && !!myName && writer.trim() === myName.trim();
+/** 사이트 HTML의 공백/&nbsp; 차이로 같은 이름이 다르게 비교되지 않도록 공백을 모두 제거하고 비교 (서버 assertOwner와 동일 규칙) */
+const normalizeName = (name: string | undefined) => (name ?? '').replace(/[\s\u00a0]/g, '');
+const isMine = (writer: string | undefined, myName: string | undefined) => !!normalizeName(writer) && normalizeName(writer) === normalizeName(myName);
 
 // ───────── 목록 (공통) ─────────
 
@@ -209,12 +211,51 @@ export function NoticeDetailScreen({ route }: ScreenProps<'NoticeDetail'>) {
       ) : (
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.title} meta={[data.writer, `조회 ${data.viewCount}`, data.writtenAt]} />
-          <Text style={detailStyles.body}>{data.content}</Text>
+          {data.blocks?.length ? (
+            data.blocks.map((block, i) => <NoticeBlockView key={i} block={block} />)
+          ) : (
+            <Text style={detailStyles.body}>{data.content}</Text>
+          )}
         </ScrollView>
       )}
     </Screen>
   );
 }
+
+/** 공지 본문 블록: 문단은 줄바꿈 유지, 표는 칸 구조 그대로 (열이 많으면 가로 스크롤) */
+function NoticeBlockView({ block }: { block: NoticeBlock }) {
+  if (block.type === 'TEXT') return <Text style={[detailStyles.body, noticeStyles.paragraph]}>{block.text}</Text>;
+
+  const cols = Math.max(...block.rows.map((r) => r.length));
+  const table = (
+    <View style={[noticeStyles.table, { minWidth: cols * 96 }]}>
+      {block.rows.map((row, r) => (
+        <View key={r} style={[noticeStyles.row, r === 0 && noticeStyles.headRow, r === block.rows.length - 1 && { borderBottomWidth: 0 }]}>
+          {Array.from({ length: cols }, (_, c) => (
+            <Text key={c} style={[noticeStyles.cell, r === 0 && noticeStyles.headCell, c === cols - 1 && { borderRightWidth: 0 }]}>
+              {row[c] ?? ''}
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={noticeStyles.tableWrap} contentContainerStyle={{ flexGrow: 1 }}>
+      {table}
+    </ScrollView>
+  );
+}
+
+const noticeStyles = StyleSheet.create({
+  paragraph: { marginBottom: 14 },
+  tableWrap: { marginBottom: 16 },
+  table: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden' },
+  row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },
+  headRow: { backgroundColor: colors.primarySoft2 },
+  cell: { flex: 1, paddingHorizontal: 8, paddingVertical: 9, borderRightWidth: 1, borderRightColor: colors.border, fontSize: font.sm, lineHeight: 18, color: colors.textBody, textAlign: 'center' },
+  headCell: { fontWeight: '700', color: colors.primaryDeep },
+});
 
 export function InquiryDetailScreen({ navigation, route }: ScreenProps<'InquiryDetail'>) {
   const { no } = route.params;

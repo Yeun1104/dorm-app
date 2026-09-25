@@ -7,7 +7,7 @@ import { Chip, EmptyState, ErrorView, LoadingView, Screen, SubHeader } from '../
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
-import { findToday } from './DormHomeScreen';
+import { dayClosure, findToday, isClosedText } from './foodMenu';
 import { dormStatusTone } from './dormShared';
 
 // ───────── 상벌점조회 ─────────
@@ -135,11 +135,11 @@ export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
 
 // ───────── 식단 ─────────
 
-const MEALS: { key: keyof Pick<FoodMenuDay, 'breakfast' | 'lunch' | 'dinner' | 'combinedMeal'>; label: string }[] = [
-  { key: 'breakfast', label: '조식' },
+// 조식은 운영하지 않아서 표시하지 않음 (조식 칸은 운영 안내 공지로만 쓰임 → dayClosure에서 사용)
+const MEALS: { key: keyof Pick<FoodMenuDay, 'lunch' | 'dinner' | 'combinedMeal'>; label: string; optional?: boolean }[] = [
   { key: 'lunch', label: '중식' },
   { key: 'dinner', label: '석식' },
-  { key: 'combinedMeal', label: '일품' },
+  { key: 'combinedMeal', label: '일품', optional: true },
 ];
 
 export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
@@ -161,7 +161,9 @@ export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
   }, [data]);
 
   const day = data?.days[dayIndex];
-  const meals = day ? MEALS.filter((m) => day[m.key]?.length) : [];
+  const closure = dayClosure(day);
+  // 중식/석식은 비어 있어도 '미운영'으로 칸을 보여주고, 일품은 있을 때만
+  const meals = day ? MEALS.filter((m) => !m.optional || day[m.key]?.length) : [];
 
   return (
     <Screen bg={colors.bgSub}>
@@ -191,8 +193,8 @@ export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
             ))}
           </View>
 
-          {meals.length === 0 ? (
-            <EmptyState icon="meal" title="미운영" message="이 날은 식당을 운영하지 않아요." />
+          {!day || closure.closed ? (
+            <EmptyState icon="meal" title="미운영" message={closure.notice ?? '이 날은 식당을 운영하지 않아요.'} />
           ) : (
             <View style={styles.mealGrid}>
               {meals.map((m, i) => (
@@ -201,9 +203,13 @@ export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
                     <Text style={styles.mealHeadText}>{m.label}</Text>
                   </View>
                   <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                    {day![m.key].map((menu, idx) => (
-                      <Text key={`${menu}-${idx}`} style={[styles.menuItem, idx < day![m.key].length - 1 && styles.menuDivider]}>{menu}</Text>
-                    ))}
+                    {!day[m.key]?.length || isClosedText(day[m.key]) ? (
+                      <Text style={[styles.menuItem, { color: colors.textMuted }]}>미운영</Text>
+                    ) : (
+                      day[m.key].map((menu, idx) => (
+                        <Text key={`${menu}-${idx}`} style={[styles.menuItem, idx < day[m.key].length - 1 && styles.menuDivider]}>{menu}</Text>
+                      ))
+                    )}
                   </View>
                 </View>
               ))}

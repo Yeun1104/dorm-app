@@ -6,7 +6,7 @@ import { reservationApi } from '../../api/trade';
 import type { Board, Reservation, ReservationStatus } from '../../api/types';
 import { userApi } from '../../api/user';
 import { useConfirm, useToast } from '../../components/Feedback';
-import { Avatar, Chip, ChipTone, CountBadge, EmptyState, ErrorView, LoadingView, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
+import { Avatar, Chip, ChipTone, CountBadge, EmptyState, ErrorView, LoadingView, PageHeader, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
 import { RESERVATION_STATUS_LABEL } from '../../constants';
 import { invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
@@ -32,7 +32,12 @@ export const STATUS_TONE: Record<ReservationStatus, ChipTone> = {
   REJECTED: 'neutral',
 };
 
-export default function ReservationManageScreen({ navigation, route }: ScreenProps<'ReservationManage'>) {
+/** 하단 '요청' 탭 루트: 내 모든 모집중 글의 요청을 게시글 선택 후 관리 */
+export function RequestsScreen(props: ScreenProps<'Requests'>) {
+  return <ReservationManageScreen {...(props as unknown as ScreenProps<'ReservationManage'>)} asTab />;
+}
+
+export default function ReservationManageScreen({ navigation, route, asTab }: ScreenProps<'ReservationManage'> & { asTab?: boolean }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>('PENDING');
@@ -129,7 +134,12 @@ export default function ReservationManageScreen({ navigation, route }: ScreenPro
         keyExtractor={(r) => String(r.id)}
         contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={detail.refreshing} onRefresh={detail.refresh} tintColor={colors.primary} />}
-        ListHeaderComponent={board ? <BoardHeader board={board} onPress={() => navigation.navigate('BoardDetail', { boardId: board.id })} /> : null}
+        ListHeaderComponent={
+          <>
+            {board && <BoardHeader board={board} onPress={() => navigation.navigate('BoardDetail', { boardId: board.id })} />}
+            <SafeNote />
+          </>
+        }
         ListEmptyComponent={<EmptyState title={`${{ PENDING: '대기중', ACCEPTED: '수락된', REJECTED: '거절된' }[tab]} 요청이 없어요`} message="새로운 요청이 오면 여기에 표시돼요." />}
         renderItem={({ item }) => (
           <RequestCard
@@ -145,7 +155,11 @@ export default function ReservationManageScreen({ navigation, route }: ScreenPro
 
   return (
     <Screen bg={colors.bgSub}>
-      <SubHeader title="참여 요청 관리" subtitle="내 게시글에 도착한 참여 요청이에요" />
+      {asTab ? (
+        <PageHeader title="참여 요청 관리" />
+      ) : (
+        <SubHeader title="참여 요청 관리" subtitle="내 게시글에 도착한 참여 요청이에요" />
+      )}
       {renderBoardPicker()}
       <SegmentedTabs
         tabs={[
@@ -172,6 +186,15 @@ function BoardHeader({ board, onPress }: { board: Board; onPress: () => void }) 
         <Text style={styles.boardEyebrow}>{board.remainingQuantity}개 남음 · 개당 {won(board.unitPrice)}</Text>
       </View>
     </Pressable>
+  );
+}
+
+function SafeNote() {
+  return (
+    <View style={styles.safeNote}>
+      <Text style={styles.safeTitle}>안심하고 거래하세요</Text>
+      <Text style={styles.safeText}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
+    </View>
   );
 }
 
@@ -230,6 +253,9 @@ const styles = StyleSheet.create({
   board: { flexDirection: 'row', gap: 11, padding: 10, borderRadius: 15, backgroundColor: colors.primarySoft2 },
   boardEyebrow: { color: '#6e837a', fontSize: font.xs },
   boardTitle: { marginVertical: 2, fontSize: font.md, fontWeight: '700', color: colors.text },
+  safeNote: { marginTop: 12, padding: 15, borderRadius: 14, backgroundColor: '#fff9e9' },
+  safeTitle: { fontSize: font.sm, fontWeight: '700', color: '#9b751d' },
+  safeText: { marginTop: 3, color: '#95865f', fontSize: font.xs },
   card: { marginTop: 12, padding: 16, borderWidth: 1, borderColor: '#e6ebe9', borderRadius: 18, backgroundColor: 'white' },
   person: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   name: { fontSize: font.base, fontWeight: '700', color: colors.text },

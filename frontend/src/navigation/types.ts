@@ -10,10 +10,13 @@ import type { LeaveKind } from '../api/dorm';
 export type AppStackParamList = {
   // 공동구매
   Home: undefined;
-  BoardWrite: undefined;
+  /** boardId가 있으면 수정 모드 */
+  BoardWrite: { boardId?: number } | undefined;
   BoardDetail: { boardId: number };
   /** boardId 없으면 내 모든 모집중 글의 요청을 게시글 선택 후 관리 */
   ReservationManage: { boardId?: number };
+  /** 하단 '요청' 탭 루트 (참여 요청 관리) */
+  Requests: undefined;
 
   // 채팅
   ChatList: undefined;
@@ -53,6 +56,7 @@ export type AppStackParamList = {
 
 export type TabParamList = {
   HomeTab: NavigatorScreenParams<AppStackParamList>;
+  RequestTab: NavigatorScreenParams<AppStackParamList>;
   ChatTab: NavigatorScreenParams<AppStackParamList>;
   DormTab: NavigatorScreenParams<AppStackParamList>;
   MyTab: NavigatorScreenParams<AppStackParamList>;

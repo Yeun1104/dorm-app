@@ -51,8 +51,11 @@ async function refreshAccessToken(): Promise<string | null> {
     const refreshToken = await tokenStorage.getRefresh();
     const res = await axios.post<{ accessToken: string }>(
       `${API_BASE_URL}/api/auth/refresh`,
-      refreshToken ? { refreshToken } : null,
-      { withCredentials: true },
+      refreshToken ? { refreshToken } : {}, // null 대신 빈 객체 전달
+      { 
+        withCredentials: true,
+        headers: { 'Content-Type': 'application/json' } // 명시적으로 JSON 타입 선언
+      },
     );
     const token = res.data?.accessToken;
     if (token) {

@@ -84,7 +84,6 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
   return (
     <Screen>
       <PageHeader
-        eyebrow="수락된 거래만 모았어요"
         title="채팅"
         right={
           <Pressable

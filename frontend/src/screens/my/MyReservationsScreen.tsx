@@ -21,7 +21,6 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'ACCEPTED', label: '수락됨' },
   { value: 'REJECTED', label: '거절됨' },
   { value: 'COMPLETED', label: '완료' },
-  { value: 'CANCELLED', label: '취소' },
 ];
 
 export default function MyReservationsScreen({ navigation }: ScreenProps<'MyReservations'>) {
@@ -34,7 +33,8 @@ export default function MyReservationsScreen({ navigation }: ScreenProps<'MyRese
     { refetchOnFocus: true },
   );
   const boards = useBoards((data ?? []).map((r) => r.boardId));
-  const list = (data ?? []).filter((r) => filter === 'ALL' || r.status === filter);
+  // 내가 취소한 요청은 내역에서 보여주지 않음
+  const list = (data ?? []).filter((r) => r.status !== 'CANCELLED' && (filter === 'ALL' || r.status === filter));
 
   const withdraw = async (r: Reservation) => {
     if (!(await confirm({ title: '참여 요청을 취소할까요?', confirmText: '요청 취소', danger: true }))) return;
