@@ -193,20 +193,23 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
 
       <BottomSheet visible={buildingSheet} onClose={() => setBuildingSheet(false)}>
         <Text style={styles.sheetTitle}>건물 선택</Text>
-        <ScrollView style={{ maxHeight: 380 }}>
-          {CAMPUS_BUILDINGS.map((b) => (
-            <Pressable
-              key={b}
-              style={styles.buildingItem}
-              onPress={() => {
-                setBuilding(b);
-                setBuildingSheet(false);
-              }}
-            >
-              <Text style={[styles.buildingItemText, b === building && { color: colors.primaryDark, fontWeight: '800' }]}>{b}</Text>
-              {b === building ? <Icon name="check" size={18} color={colors.primaryDark} /> : <Icon name="chevron" size={16} color={colors.textFaint} />}
-            </Pressable>
-          ))}
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {CAMPUS_BUILDINGS.map((b) => {
+            const active = b === building;
+            return (
+              <Pressable
+                key={b}
+                style={[styles.buildingItem, active && styles.buildingItemActive]}
+                onPress={() => {
+                  setBuilding(b);
+                  setBuildingSheet(false);
+                }}
+              >
+                <Text style={[styles.buildingItemText, active && styles.buildingItemTextActive]}>{b}</Text>
+                {active && <Icon name="check" size={18} color={colors.text} strokeWidth={2.2} />}
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </BottomSheet>
     </Screen>
@@ -221,8 +224,10 @@ const styles = StyleSheet.create({
   buildingBtn: { flex: 1, minHeight: 47, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, borderRadius: 11, borderWidth: 1, borderColor: '#dfe6e3', backgroundColor: 'white' },
   buildingText: { flexShrink: 1, fontSize: font.base, color: colors.text },
   sheetTitle: { marginBottom: 8, fontSize: 20, fontWeight: '800', color: colors.text },
-  buildingItem: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  buildingItemText: { fontSize: font.base, color: colors.text },
+  buildingItem: { height: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12 },
+  buildingItemActive: { backgroundColor: '#f1f3f2' },
+  buildingItemText: { fontSize: font.base, color: colors.textBody },
+  buildingItemTextActive: { color: colors.text, fontWeight: '700' },
   preview: { marginTop: 2, marginBottom: 4, padding: 13, borderRadius: 12, backgroundColor: colors.primarySoft2 },
   previewText: { color: colors.primaryDeep, fontSize: font.base },
 });
