@@ -4,6 +4,7 @@ import com.soongsil.soongpal.common.exception.DormErrorCode;
 import com.soongsil.soongpal.common.exception.DormException;
 import com.soongsil.soongpal.dorm.domain.DormAccount;
 import com.soongsil.soongpal.dorm.domain.RepairSearchField;
+import com.soongsil.soongpal.dorm.dto.NoticeContentBlockDto;
 import com.soongsil.soongpal.dorm.dto.NoticeDetailDto;
 import com.soongsil.soongpal.dorm.dto.NoticeListItemDto;
 import com.soongsil.soongpal.dorm.repository.DormAccountRepository;
@@ -146,7 +147,8 @@ public class DormNoticeService {
             String writer = extractLabeledValue(doc, "작성자:");
             String viewCountStr = extractLabeledValue(doc, "조회수:");
             String writtenAt = extractLabeledValue(doc, "작성일:");
-            String content = extractContent(doc);
+            List<NoticeContentBlockDto> blocks = NoticeContentParser.parse(doc.selectFirst("td.descript"));
+            String content = NoticeContentParser.toPlainText(blocks);
 
             int viewCount;
             try {
@@ -155,7 +157,7 @@ public class DormNoticeService {
                 viewCount = 0;
             }
 
-            return new NoticeDetailDto(no, title, writer, viewCount, writtenAt, content);
+            return new NoticeDetailDto(no, title, writer, viewCount, writtenAt, content, blocks);
         } catch (Exception e) {
             log.error("공지사항 상세 파싱 실패 (no={})", no, e);
             throw new DormException(DormErrorCode.DORM_PARSING_FAILED, e);
@@ -175,11 +177,6 @@ public class DormNoticeService {
             }
         }
         return "";
-    }
-
-    private String extractContent(Document doc) {
-        Element contentTd = doc.selectFirst("td.descript");
-        return contentTd != null ? contentTd.text().trim() : "";
     }
 
     private Long extractDetailNo(String hrefAttr) {
