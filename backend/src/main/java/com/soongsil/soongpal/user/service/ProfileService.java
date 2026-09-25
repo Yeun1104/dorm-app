@@ -15,6 +15,7 @@ import com.soongsil.soongpal.user.dto.ProfileResDto;
 import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class ProfileService {
     private final ReservationRepository reservationRepository;
     private final MannerReviewService mannerReviewService;
 
+    @Transactional(readOnly = true)
     public ProfileResDto getProfile(Long targetUserId) {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));

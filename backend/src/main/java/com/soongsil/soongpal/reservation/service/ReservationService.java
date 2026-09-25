@@ -145,7 +145,10 @@ public class ReservationService {
         return ReservationResDto.from(reservation);
     }
 
+    // ⚠️ open-in-view:false라서, ReservationResDto.from()이 reservation.getBoard()/getBuyer() 같은
+    // 지연로딩 연관관계를 세션이 열려있는 트랜잭션 안에서 다 읽고 끝내야 함. 없으면 LazyInitializationException.
     /** API 2: 방장용 참여 요청 목록 조회. 신청자 프로필(거래횟수/노쇼 신고이력)이 같이 내려감. 방장만 조회 가능. */
+    @Transactional(readOnly = true)
     public List<ReservationResDto> getReservationsByBoard(Long userId, Long boardId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new BoardException(BoardErrorCode.BOARD_NOT_FOUND));
@@ -159,6 +162,7 @@ public class ReservationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ReservationResDto> getMyReservations(Long buyerId) {
         return reservationRepository.findByBuyerId(buyerId).stream()
                 .map(ReservationResDto::from)
