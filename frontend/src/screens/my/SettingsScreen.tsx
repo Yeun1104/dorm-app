@@ -9,6 +9,7 @@ import { Screen, SubHeader } from '../../components/ui';
 import { clearBoardCache } from '../../hooks/useBoards';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
+import { HISTORY_SETTINGS_DEFAULTS, HistorySettings, historySettings } from '../../utils/historySettings';
 import { prefs } from '../../utils/prefs';
 
 const SWITCH_BLUE = '#3478f6';
@@ -36,9 +37,18 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
   const confirm = useConfirm();
   const [noti, setNoti] = useState<NotificationSettings>(NOTIFICATION_DEFAULTS);
 
+  const [record, setRecord] = useState<HistorySettings>(HISTORY_SETTINGS_DEFAULTS);
+
   useEffect(() => {
     prefs.get('notifications', NOTIFICATION_DEFAULTS).then(setNoti);
+    historySettings.get().then(setRecord);
   }, []);
+
+  const updateRecord = (patch: Partial<HistorySettings>) => {
+    const next = { ...record, ...patch };
+    setRecord(next);
+    historySettings.set(next).catch(() => toast('설정을 저장하지 못했어요'));
+  };
 
   const updateNoti = (patch: Partial<NotificationSettings>) => {
     const next = { ...noti, ...patch };
@@ -109,6 +119,24 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
               />
             </View>
           ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>기록</Text>
+          <View style={styles.item}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>최근 검색 기록 저장</Text>
+              <Text style={styles.itemSub}>끄면 검색어를 기록하지 않아요</Text>
+            </View>
+            <Switch value={record.search} onValueChange={(v) => updateRecord({ search: v })} {...switchColors} />
+          </View>
+          <View style={[styles.item, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>최근 본 게시글 저장</Text>
+              <Text style={styles.itemSub}>끄면 본 게시글을 기록하지 않아요</Text>
+            </View>
+            <Switch value={record.viewed} onValueChange={(v) => updateRecord({ viewed: v })} {...switchColors} />
+          </View>
         </View>
 
         <View style={styles.section}>

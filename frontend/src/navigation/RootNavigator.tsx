@@ -30,6 +30,7 @@ import BoardDetailScreen from '../screens/home/BoardDetailScreen';
 import BoardSearchScreen from '../screens/home/BoardSearchScreen';
 import BoardWriteScreen from '../screens/home/BoardWriteScreen';
 import HomeScreen from '../screens/home/HomeScreen';
+import NotificationsScreen from '../screens/home/NotificationsScreen';
 import ReservationManageScreen, { RequestsScreen } from '../screens/home/ReservationManageScreen';
 import DormAccountScreen from '../screens/my/DormAccountScreen';
 import { LikedBoardsScreen, MyPostsScreen } from '../screens/my/MyBoardListScreen';
@@ -56,6 +57,7 @@ function sharedScreens() {
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       <Stack.Screen name="Report" component={ReportScreen} />
       <Stack.Screen name="MyPosts" component={MyPostsScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </>
   );
 }
@@ -65,6 +67,7 @@ function HomeStack() {
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="BoardSearch" component={BoardSearchScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
       {sharedScreens()}
     </Stack.Navigator>
   );
@@ -120,7 +123,6 @@ function MyStack() {
       <Stack.Screen name="LikedBoards" component={LikedBoardsScreen} />
       <Stack.Screen name="DormAccount" component={DormAccountScreen} />
       <Stack.Screen name="DormLink" component={DormLinkScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
       {sharedScreens()}
     </Stack.Navigator>
   );

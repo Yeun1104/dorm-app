@@ -5,13 +5,14 @@ import { boardApi, LocalImage } from '../../api/board';
 import { errorMessage } from '../../api/client';
 import { useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { BottomSheet, Button, ErrorView, Field, FormScroll, Input, LoadingView, Screen, SubHeader, Thumb } from '../../components/ui';
+import { BottomSheet, Button, ErrorView, Field, FormScroll, Input, LoadingView, Screen, SearchBox, SubHeader, Thumb } from '../../components/ui';
 import { MAX_BOARD_IMAGES } from '../../constants';
 import { invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { won } from '../../utils/format';
+import { hangulFilter } from '../../utils/hangul';
 import { CAMPUS_BUILDINGS, joinPlace, splitPlace } from '../../utils/place';
 
 const toInt = (s: string) => {
@@ -36,6 +37,7 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
   const [building, setBuilding] = useState('');
   const [placeDetail, setPlaceDetail] = useState('');
   const [buildingSheet, setBuildingSheet] = useState(false);
+  const [buildingQuery, setBuildingQuery] = useState('');
   const [url, setUrl] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -178,7 +180,13 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
           </Field>
           <Field label="수령 장소" hint="목록에는 건물 이름만 보이고, 상세 위치는 게시글 안에서 보여요">
             <View style={styles.placeRow}>
-              <Pressable style={styles.buildingBtn} onPress={() => setBuildingSheet(true)}>
+              <Pressable
+                style={styles.buildingBtn}
+                onPress={() => {
+                  setBuildingQuery('');
+                  setBuildingSheet(true);
+                }}
+              >
                 <Text style={[styles.buildingText, !building && { color: '#9aa5a1' }]} numberOfLines={1}>{building || '건물 선택'}</Text>
                 <Icon name="down" size={16} color={colors.textMuted} />
               </Pressable>
@@ -193,8 +201,12 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
 
       <BottomSheet visible={buildingSheet} onClose={() => setBuildingSheet(false)}>
         <Text style={styles.sheetTitle}>건물 선택</Text>
-        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-          {CAMPUS_BUILDINGS.map((b) => {
+        <View style={{ marginBottom: 8 }}>
+          <SearchBox value={buildingQuery} onChangeText={setBuildingQuery} placeholder="건물 이름 검색 (초성도 돼요)" />
+        </View>
+        <ScrollView style={{ height: 360 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {hangulFilter(CAMPUS_BUILDINGS, buildingQuery).length === 0 && <Text style={styles.buildingEmpty}>검색 결과가 없어요</Text>}
+          {hangulFilter(CAMPUS_BUILDINGS, buildingQuery).map((b) => {
             const active = b === building;
             return (
               <Pressable
@@ -227,6 +239,7 @@ const styles = StyleSheet.create({
   buildingItem: { height: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12 },
   buildingItemActive: { backgroundColor: '#f1f3f2' },
   buildingItemText: { fontSize: font.base, color: colors.textBody },
+  buildingEmpty: { paddingVertical: 24, textAlign: 'center', fontSize: font.sm, color: colors.textMuted },
   buildingItemTextActive: { color: colors.text, fontWeight: '700' },
   preview: { marginTop: 2, marginBottom: 4, padding: 13, borderRadius: 12, backgroundColor: colors.primarySoft2 },
   previewText: { color: colors.primaryDeep, fontSize: font.base },

@@ -12,6 +12,7 @@ import { useLikeToggle } from '../../hooks/useLikeToggle';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font, shadow } from '../../theme';
 import { won } from '../../utils/format';
+import { HISTORY_SETTINGS_DEFAULTS, HistorySettings, historySettings } from '../../utils/historySettings';
 import { prefs } from '../../utils/prefs';
 import { RecentBoard, recentBoards } from '../../utils/recentBoards';
 
@@ -47,17 +48,29 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
   const reqId = useRef(0);
 
   const [recent, setRecent] = useState<RecentBoard[]>([]);
+  const [recordSettings, setRecordSettings] = useState<HistorySettings>(HISTORY_SETTINGS_DEFAULTS);
 
   useEffect(() => {
     prefs.get<string[]>(HISTORY_KEY, []).then(setHistory);
   }, []);
 
-  // 상세 보고 돌아오면 최근 본 글이 바뀌어 있으니 포커스마다 다시 읽음
+  // 상세/설정에서 돌아오면 최근 본 글·기록 설정이 바뀌어 있을 수 있으니 포커스마다 다시 읽음
   useFocusEffect(
     useCallback(() => {
       recentBoards.get().then(setRecent);
+      historySettings.get().then(setRecordSettings);
     }, []),
   );
+
+  const removeRecent = (id: number) => {
+    setRecent((prev) => prev.filter((b) => b.id !== id));
+    recentBoards.remove(id).catch(() => {});
+  };
+
+  const clearRecent = () => {
+    setRecent([]);
+    recentBoards.clear().catch(() => {});
+  };
 
   // 탭바는 검색 결과를 보는 동안 숨김 (RootNavigator가 이 값을 봄)
   useEffect(() => {
@@ -102,7 +115,7 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
     const kw = text.trim();
     if (!kw) return;
     setKeyword(kw);
-    saveHistory([kw, ...history.filter((h) => h !== kw)].slice(0, HISTORY_MAX));
+    if (recordSettings.search) saveHistory([kw, ...history.filter((h) => h !== kw)].slice(0, HISTORY_MAX));
     queryRef.current = { ...queryRef.current, keyword: kw };
     setSearched(true);
     setBoards([]);
@@ -137,16 +150,18 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
   let body;
   if (!searched)
     body = (
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 30 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 20 }}>
         <View style={styles.historyHead}>
           <Text style={styles.historyTitle}>최근 검색</Text>
-          {history.length > 0 && (
+          {recordSettings.search && history.length > 0 && (
             <Pressable onPress={() => saveHistory([])} hitSlop={8}>
               <Text style={styles.historyClear}>전체 삭제</Text>
             </Pressable>
           )}
         </View>
-        {history.length === 0 ? (
+        {!recordSettings.search ? (
+          <Text style={styles.historyEmpty}>최근 검색 기록 저장이 꺼져 있어요</Text>
+        ) : history.length === 0 ? (
           <Text style={styles.historyEmpty}>최근 검색 기록이 없어요</Text>
         ) : (
           history.map((h) => (
@@ -160,13 +175,21 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
           ))
         )}
 
-        {recent.length > 0 && (
+        {recordSettings.viewed && recent.length > 0 && (
           <>
-            <Text style={[styles.historyTitle, { marginTop: 28, marginBottom: 12 }]}>최근 본 게시글</Text>
+            <View style={[styles.historyHead, { marginTop: 28, marginBottom: 12 }]}>
+              <Text style={styles.historyTitle}>최근 본 게시글</Text>
+              <Pressable onPress={clearRecent} hitSlop={8}>
+                <Text style={styles.historyClear}>전체 삭제</Text>
+              </Pressable>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -18 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 12 }}>
               {recent.map((b) => (
                 <Pressable key={b.id} style={styles.recentCard} onPress={() => navigation.navigate('BoardDetail', { boardId: b.id })}>
                   <Thumb uri={b.imageUrl} size={116} radius={14} />
+                  <Pressable style={styles.recentRemove} onPress={() => removeRecent(b.id)} hitSlop={8} accessibilityLabel="최근 본 게시글에서 삭제">
+                    <Icon name="close" size={12} color="white" strokeWidth={2.4} />
+                  </Pressable>
                   <Text style={styles.recentTitle} numberOfLines={1}>{b.title}</Text>
                   <Text style={styles.recentPrice}>
                     {won(b.unitPrice)}
@@ -177,6 +200,10 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
             </ScrollView>
           </>
         )}
+
+        <Pressable style={styles.recordLink} onPress={() => navigation.navigate('Settings')} hitSlop={8}>
+          <Text style={styles.recordLinkText}>{recordSettings.search || recordSettings.viewed ? '기록 끄기' : '기록 설정'}</Text>
+        </Pressable>
       </ScrollView>
     );
   else if (loading && boards.length === 0) body = <LoadingView />;
@@ -255,6 +282,9 @@ const styles = StyleSheet.create({
   historyEmpty: { marginTop: 18, textAlign: 'center', fontSize: font.sm, color: colors.textMuted },
   historyRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   recentCard: { width: 116 },
+  recentRemove: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(22,29,27,0.55)', alignItems: 'center', justifyContent: 'center' },
+  recordLink: { marginTop: 'auto', paddingTop: 24, alignSelf: 'flex-end' },
+  recordLinkText: { fontSize: font.xs, color: colors.textMuted, textDecorationLine: 'underline' },
   recentTitle: { marginTop: 7, fontSize: font.sm, fontWeight: '600', color: colors.text },
   recentPrice: { marginTop: 2, fontSize: font.sm, fontWeight: '800', color: colors.text },
   recentDone: { fontSize: font.xs, fontWeight: '600', color: colors.textFaint },

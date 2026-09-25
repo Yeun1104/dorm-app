@@ -85,7 +85,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             <Pressable style={styles.iconButton} onPress={() => navigation.navigate('BoardSearch')} accessibilityLabel="검색">
               <Icon name="search" />
             </Pressable>
-            <Pressable style={styles.iconButton} onPress={() => toast('새로운 알림이 없어요')} accessibilityLabel="알림">
+            <Pressable style={styles.iconButton} onPress={() => navigation.navigate('Notifications')} accessibilityLabel="알림">
               <Icon name="bell" />
             </Pressable>
           </View>
