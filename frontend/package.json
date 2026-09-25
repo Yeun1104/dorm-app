@@ -1,0 +1,37 @@
+{
+  "name": "soongpal-app",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "^7.19.2",
+    "@react-navigation/native": "^7.4.1",
+    "@react-navigation/native-stack": "^7.19.2",
+    "@stomp/stompjs": "^7.3.0",
+    "axios": "^1.20.0",
+    "expo": "~57.0.24",
+    "expo-constants": "~57.0.19",
+    "expo-image": "~57.0.5",
+    "expo-image-picker": "~57.0.19",
+    "expo-linking": "~57.0.10",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "text-encoding": "^0.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}
