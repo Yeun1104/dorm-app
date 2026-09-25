@@ -7,12 +7,9 @@ import { WS_URL } from '../config';
 /**
  * 백엔드 ChattingConfig 기준
  *  - 엔드포인트: /ws/chat (SockJS) → RN에서는 raw WebSocket 경로 /ws/chat/websocket 사용
+ *  - 인증: CONNECT 프레임의 Authorization 헤더 (StompAuthInterceptor). 없거나 만료면 연결 거부
  *  - 구독: /topic/{roomId}
  *  - 발행: /send/{roomId}  body: { content }
- *
- * ⚠️ 서버에 STOMP ChannelInterceptor가 없어서 CONNECT 헤더의 토큰은 읽지 않음.
- *    발신자 식별은 핸드셰이크 HTTP 요청의 Authorization 헤더(JwtAuthenticationFilter)에 의존하므로,
- *    RN WebSocket의 3번째 인자(headers)로 토큰을 핸드셰이크에 실어 보냄.
  */
 export function useChatSocket(roomId: number, onMessage: (msg: ChatMessage) => void) {
   const clientRef = useRef<Client | null>(null);
@@ -21,50 +18,39 @@ export function useChatSocket(roomId: number, onMessage: (msg: ChatMessage) => v
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const client = new Client({
+      brokerURL: WS_URL,
+      reconnectDelay: 3000,
+      heartbeatIncoming: 10000,
+      heartbeatOutgoing: 10000,
+      // RN WebSocket 관련 권장 설정 (stompjs 문서 "React Native" 항목)
+      forceBinaryWSFrames: true,
+      appendMissingNULLonIncoming: true,
+      // (재)연결할 때마다 최신 토큰을 읽음 — 그 사이 axios 인터셉터가 토큰을 재발급했을 수 있음
+      beforeConnect: async () => {
+        const token = await tokenStorage.get();
+        client.connectHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      },
+      onConnect: () => {
+        setConnected(true);
+        client.subscribe(`/topic/${roomId}`, (frame: IMessage) => {
+          try {
+            onMessageRef.current(JSON.parse(frame.body) as ChatMessage);
+          } catch {
+            // 파싱 불가한 프레임은 무시
+          }
+        });
+      },
+      onWebSocketClose: () => setConnected(false),
+      onStompError: () => setConnected(false),
+    });
 
-    (async () => {
-      const token = await tokenStorage.get();
-      if (cancelled) return;
-      const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
-      const client = new Client({
-        webSocketFactory: () =>
-          // RN 전용 시그니처: new WebSocket(url, protocols, { headers })
-          new (WebSocket as unknown as new (url: string, protocols: string[], options: { headers: Record<string, string> }) => WebSocket)(
-            WS_URL,
-            ['v12.stomp', 'v11.stomp', 'v10.stomp'],
-            { headers: authHeaders },
-          ),
-        connectHeaders: authHeaders,
-        reconnectDelay: 3000,
-        heartbeatIncoming: 10000,
-        heartbeatOutgoing: 10000,
-        // RN WebSocket 관련 권장 설정 (stompjs 문서 "React Native" 항목)
-        forceBinaryWSFrames: true,
-        appendMissingNULLonIncoming: true,
-        onConnect: () => {
-          setConnected(true);
-          client.subscribe(`/topic/${roomId}`, (frame: IMessage) => {
-            try {
-              onMessageRef.current(JSON.parse(frame.body) as ChatMessage);
-            } catch {
-              // 파싱 불가한 프레임은 무시
-            }
-          });
-        },
-        onWebSocketClose: () => setConnected(false),
-        onStompError: () => setConnected(false),
-      });
-
-      clientRef.current = client;
-      client.activate();
-    })();
+    clientRef.current = client;
+    client.activate();
 
     return () => {
-      cancelled = true;
       setConnected(false);
-      clientRef.current?.deactivate();
+      client.deactivate();
       clientRef.current = null;
     };
   }, [roomId]);

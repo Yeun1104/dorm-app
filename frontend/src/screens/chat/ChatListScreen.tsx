@@ -50,6 +50,7 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
   const renderRoom = ({ item }: { item: ChatRoom }) => {
     const other = item.users.find((u) => u.userId !== me.userId);
     const isSelected = selected.includes(item.id);
+    const unread = item.unreadCount ?? 0;
     return (
       <Pressable
         style={[styles.item, isSelected && styles.itemSelected]}
@@ -66,11 +67,16 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
             <Text style={styles.name} numberOfLines={1}>{other?.userName ?? item.name}</Text>
             <Text style={styles.time}>{chatListTime(item.lastMessageTime)}</Text>
           </View>
-          <Text style={[styles.preview, !item.lastMessage && styles.previewEmpty]} numberOfLines={1}>
+          <Text style={[styles.preview, (!item.lastMessage || unread === 0) && styles.previewRead]} numberOfLines={1}>
             {item.lastMessage ?? '채팅방이 열렸어요. 먼저 인사해보세요!'}
           </Text>
           <Text style={styles.product} numberOfLines={1}>{item.productTitle}</Text>
         </View>
+        {unread > 0 && (
+          <View style={styles.unread}>
+            <Text style={styles.unreadText}>{unread > 99 ? '99+' : unread}</Text>
+          </View>
+        )}
       </Pressable>
     );
   };
@@ -161,7 +167,9 @@ const styles = StyleSheet.create({
   name: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: colors.text },
   time: { color: '#9da4a1', fontSize: font.xs },
   preview: { marginTop: 4, marginBottom: 3, fontSize: font.md, color: colors.text },
-  previewEmpty: { color: '#939b98' },
+  previewRead: { color: '#939b98' },
+  unread: { minWidth: 19, height: 19, paddingHorizontal: 5, marginTop: 18, borderRadius: 10, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  unreadText: { color: 'white', fontSize: 10, fontWeight: '700' },
   product: { color: colors.primaryDark, fontSize: font.xs },
   editBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 62, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#e0e7e9', backgroundColor: 'white' },
   editCount: { fontSize: font.md, color: '#6d7b81' },

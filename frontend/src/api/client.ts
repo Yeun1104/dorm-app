@@ -47,10 +47,13 @@ let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
   try {
-    // 백엔드 AuthController: 쿠키(refreshToken)로 재발급, 응답은 CommonResDto로 감싸지 않은 { accessToken }
-    const res = await axios.post<{ accessToken: string }>(`${API_BASE_URL}/api/auth/refresh`, null, {
-      withCredentials: true,
-    });
+    // 백엔드 AuthController: body의 refreshToken 우선, 없으면 쿠키. 응답은 CommonResDto로 감싸지 않은 { accessToken }
+    const refreshToken = await tokenStorage.getRefresh();
+    const res = await axios.post<{ accessToken: string }>(
+      `${API_BASE_URL}/api/auth/refresh`,
+      refreshToken ? { refreshToken } : null,
+      { withCredentials: true },
+    );
     const token = res.data?.accessToken;
     if (token) {
       await tokenStorage.set(token);
