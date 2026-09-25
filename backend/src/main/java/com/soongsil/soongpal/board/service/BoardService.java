@@ -83,6 +83,10 @@ public class BoardService {
         return BoardResDto.from(board, 0, false, savedBoard.getTotalQuantity(), 0);
     }
 
+    // ⚠️ open-in-view: false라서, 세션이 열려있는 이 트랜잭션 안에서 board.getUser() 같은 지연로딩 연관관계를
+    // 다 읽어서 DTO로 변환까지 끝내야 함. @Transactional이 없으면 컨트롤러에 응답 돌아가기 직전(세션 닫힌 뒤)에
+    // BoardResDto.from()이 board.getUser().getNickName()을 읽으려다 LazyInitializationException이 남.
+    @Transactional(readOnly = true)
     public BoardResDto getBoardById(Long id, Long userId) {
         Board findBoard = boardRepository.findById(id)
                 .orElseThrow(() -> new BoardException(BoardErrorCode.BOARD_NOT_FOUND));
@@ -181,6 +185,7 @@ public class BoardService {
         findBoard.softDeleteByUser();
     }
 
+    @Transactional(readOnly = true)
     public BoardPageResDto getFilteredBoards(String keyword, Long userId, BoardCategory category, BoardStatus status, int page) {
         Pageable pageable = PageRequest.of(page, 20, Sort.by("createdAt").descending());
         Page<Board> boardsPage;

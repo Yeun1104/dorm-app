@@ -86,6 +86,9 @@ public class ReportService {
         }
     }
 
+    // ⚠️ open-in-view:false라서, ReportResDto.from()이 report.getReporter()/getReportedUser() 같은
+    // 지연로딩 연관관계를 세션이 열려있는 트랜잭션 안에서 다 읽고 끝내야 함. 없으면 LazyInitializationException.
+    @Transactional(readOnly = true)
     public Page<ReportResDto> getReports(ReportStatus status, int page) {
         Pageable pageable = PageRequest.of(page, 20, Sort.by("createdAt").descending());
         Page<Report> reports = (status != null)
