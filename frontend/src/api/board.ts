@@ -1,4 +1,5 @@
 import { api, del, get, patch, post } from './client';
+import { Platform } from 'react-native';
 import type { Board, BoardCreateReq, BoardPage, BoardStatus, CommonRes, LikeRes } from './types';
 
 export interface LocalImage {
@@ -22,11 +23,19 @@ export const boardApi = {
    */
   async create(body: BoardCreateReq, images: LocalImage[]): Promise<Board> {
     const form = new FormData();
-    // RN의 FormData는 Blob을 못 만들어서, uri 파트 + type 지정으로 JSON 파트를 보냄
-    form.append('board', {
-      string: JSON.stringify(body),
-      type: 'application/json',
-    } as unknown as Blob);
+    
+    // 1. JSON DTO 파트 (Web과 App 분기)
+    if (Platform.OS === 'web') {
+      // 웹 환경: 브라우저 표준 Blob 객체 사용
+      form.append('board', new Blob([JSON.stringify(body)], { type: 'application/json' }));
+    } else {
+      // 앱 환경: React Native 꼼수 유지
+      form.append('board', {
+        string: JSON.stringify(body),
+        type: 'application/json',
+      } as unknown as Blob);
+    }
+
     images.forEach((img, i) => {
       form.append('images', {
         uri: img.uri,
@@ -34,6 +43,7 @@ export const boardApi = {
         type: img.mimeType ?? 'image/jpeg',
       } as unknown as Blob);
     });
+
     const res = await api.post<CommonRes<Board>>('/api/board', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       transformRequest: (d) => d,
