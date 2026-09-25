@@ -33,6 +33,7 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 @Service
+@Transactional(readOnly = true)
 public class BoardService {
 
     private final BoardRepository boardRepository;

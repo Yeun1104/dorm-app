@@ -2,7 +2,6 @@ package com.soongsil.soongpal.board.dto;
 
 import com.soongsil.soongpal.board.domain.Board;
 import com.soongsil.soongpal.board.domain.BoardCategory;
-import com.soongsil.soongpal.board.domain.BoardImage;
 import com.soongsil.soongpal.board.domain.BoardStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -55,8 +54,9 @@ public class BoardResDto {
                 .status(board.getStatus())
                 .likeCount(likeCount)
                 .liked(liked)
-                .authorId(board.getUser().getId())
-                .authorNickname(board.getUser().getNickName())
+                // User가 null인지 확인하는 방어 로직
+                .authorId(board.getUser() != null ? board.getUser().getId() : null)
+                .authorNickname(board.getUser() != null ? board.getUser().getNickName() : "알 수 없음")
                 .createdAt(board.getCreatedAt())
                 .images(board.getBoardImages().stream()
                         .map(BoardImageDto::new)
