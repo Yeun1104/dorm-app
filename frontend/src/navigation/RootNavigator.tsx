@@ -27,7 +27,7 @@ import { LeaveDetailScreen, LeaveFormScreen, LeaveListScreen } from '../screens/
 import BoardDetailScreen from '../screens/home/BoardDetailScreen';
 import BoardWriteScreen from '../screens/home/BoardWriteScreen';
 import HomeScreen from '../screens/home/HomeScreen';
-import ReservationManageScreen from '../screens/home/ReservationManageScreen';
+import ReservationManageScreen, { RequestsScreen } from '../screens/home/ReservationManageScreen';
 import DormAccountScreen from '../screens/my/DormAccountScreen';
 import { LikedBoardsScreen, MyPostsScreen } from '../screens/my/MyBoardListScreen';
 import MyPageScreen from '../screens/my/MyPageScreen';
@@ -60,6 +60,15 @@ function HomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen name="Home" component={HomeScreen} />
+      {sharedScreens()}
+    </Stack.Navigator>
+  );
+}
+
+function RequestStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen name="Requests" component={RequestsScreen} />
       {sharedScreens()}
     </Stack.Navigator>
   );
@@ -115,6 +124,7 @@ function MyStack() {
 
 const TAB_ROOTS: Record<keyof TabParamList, keyof AppStackParamList> = {
   HomeTab: 'Home',
+  RequestTab: 'Requests',
   ChatTab: 'ChatList',
   DormTab: 'DormHome',
   MyTab: 'MyPage',
@@ -122,6 +132,7 @@ const TAB_ROOTS: Record<keyof TabParamList, keyof AppStackParamList> = {
 
 const TAB_ICONS: Record<keyof TabParamList, IconName> = {
   HomeTab: 'home',
+  RequestTab: 'inbox',
   ChatTab: 'chat',
   DormTab: 'dorm',
   MyTab: 'user',
@@ -150,6 +161,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: '공동구매' }} />
+      <Tab.Screen name="RequestTab" component={RequestStack} options={{ title: '요청' }} />
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: '채팅' }} />
       <Tab.Screen name="DormTab" component={DormStack} options={{ title: '기숙사생활' }} />
       <Tab.Screen name="MyTab" component={MyStack} options={{ title: '마이' }} />

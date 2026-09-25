@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { errorMessage } from '../../api/client';
 import { LeaveKind, leaveApi } from '../../api/dorm';
@@ -151,7 +151,10 @@ export function LeaveDetailScreen({ navigation, route }: ScreenProps<'LeaveDetai
           </View>
           <Text style={styles.memoLabel}>사유</Text>
           <Text style={styles.memo}>{data.memo || '-'}</Text>
-          <Button label="삭제" variant="dangerOutline" onPress={remove} loading={deleting} style={{ marginTop: 24, height: 48 }} />
+          <View style={styles.detailActions}>
+            <Button label="수정" variant="outline" onPress={() => navigation.navigate('LeaveForm', { kind, editNo: no })} style={{ flex: 1, height: 48 }} />
+            <Button label="삭제" variant="dangerOutline" onPress={remove} loading={deleting} style={{ flex: 1, height: 48 }} />
+          </View>
         </ScrollView>
       )}
     </Screen>
@@ -161,14 +164,27 @@ export function LeaveDetailScreen({ navigation, route }: ScreenProps<'LeaveDetai
 // ───────── 작성 ─────────
 
 export function LeaveFormScreen({ navigation, route }: ScreenProps<'LeaveForm'>) {
-  const { kind } = route.params;
+  const { kind, editNo } = route.params;
   const toast = useToast();
+  const confirm = useConfirm();
   const defaults = useFetch(() => leaveApi.formDefaults(kind), [kind]);
+  const original = useFetch(() => leaveApi.detail(kind, editNo!), [kind, editNo], { enabled: editNo != null });
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
   const [memo, setMemo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // 수정 모드: 기존 신청 내용으로 채우기 (최초 1회)
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    const o = original.data;
+    if (!o || prefilled) return;
+    setStart(parseLocalDate(o.startDate));
+    setEnd(parseLocalDate(o.endDate));
+    setMemo(o.memo ?? '');
+    setPrefilled(true);
+  }, [original.data, prefilled]);
 
   const d = defaults.data;
   const maxEnd = parseLocalDate(d?.maxEndDate);
@@ -178,14 +194,40 @@ export function LeaveFormScreen({ navigation, route }: ScreenProps<'LeaveForm'>)
     const err = validateRange(kind, start, end) ?? (!memo.trim() ? '사유를 입력해주세요' : null);
     if (err) return setError(err);
     if (maxEnd && end! > maxEnd) return setError(`종료일은 ${d!.maxEndDate}까지 선택할 수 있어요`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (start! < today) return setError('시작일은 오늘 이후로 선택해주세요');
+
+    // 기숙사 사이트에 수정 기능이 없어서, 수정 = 기존 신청 삭제 후 재신청
+    if (editNo != null) {
+      const ok = await confirm({
+        title: '신청을 수정할까요?',
+        message: '기존 신청을 삭제하고 입력한 내용으로 다시 신청해요. 승인 상태는 처음부터 다시 진행돼요.',
+        confirmText: '수정',
+      });
+      if (!ok) return;
+    }
+
     setSubmitting(true);
     setError(null);
+    let removed = false;
     try {
+      if (editNo != null) {
+        await leaveApi.remove(kind, editNo);
+        removed = true;
+      }
       await leaveApi.create(kind, { startDate: toLocalDateString(start!), endDate: toLocalDateString(end!), memo: memo.trim() });
-      toast('신청을 완료했어요');
-      navigation.goBack();
+      toast(editNo != null ? '신청을 수정했어요' : '신청을 완료했어요');
+      if (editNo != null) navigation.navigate('LeaveList', { kind });
+      else navigation.goBack();
     } catch (e) {
-      setError(errorMessage(e));
+      // 삭제는 됐는데 재신청이 실패한 경우: 입력 내용은 그대로 두고 새 신청으로 다시 시도할 수 있게 함
+      if (removed) {
+        navigation.setParams({ editNo: undefined });
+        setError(`기존 신청은 삭제됐지만 다시 신청하지 못했어요. 제출을 다시 눌러주세요. (${errorMessage(e)})`);
+      } else {
+        setError(errorMessage(e));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -193,13 +235,15 @@ export function LeaveFormScreen({ navigation, route }: ScreenProps<'LeaveForm'>)
 
   return (
     <Screen bg="white" edges={['top', 'bottom']}>
-      <SubHeader title={`${TEXT[kind].title}하기`} />
-      {defaults.loading && !d ? (
+      <SubHeader title={editNo != null ? `${TEXT[kind].title} 수정` : `${TEXT[kind].title}하기`} />
+      {(defaults.loading && !d) || (editNo != null && original.loading && !original.data) ? (
         <LoadingView />
       ) : defaults.error && !d ? (
         <ErrorView message={defaults.error} onRetry={defaults.reload} />
+      ) : editNo != null && original.error && !original.data ? (
+        <ErrorView message={original.error} onRetry={original.reload} />
       ) : (
-        <FormScroll footer={<Button label="제출" onPress={submit} loading={submitting} />}>
+        <FormScroll footer={<Button label={editNo != null ? '수정하기' : '제출'} onPress={submit} loading={submitting} />}>
           <View style={styles.applicant}>
             {[
               ['신청자', d?.applicantName],
@@ -255,6 +299,7 @@ const styles = StyleSheet.create({
   infoRow: { minHeight: 46, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   infoLabel: { color: '#89928f', fontSize: font.sm },
   infoValue: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
+  detailActions: { marginTop: 24, flexDirection: 'row', gap: 8 },
   memoLabel: { marginTop: 18, marginBottom: 6, fontSize: font.sm, fontWeight: '700', color: '#53605b' },
   memo: { fontSize: font.base, lineHeight: 22, color: colors.textBody },
   applicant: { marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primarySoft2, gap: 5 },

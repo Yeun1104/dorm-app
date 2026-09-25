@@ -231,7 +231,7 @@ export function FilterPills<T extends string>({ options, value, onChange }: { op
 
 // ───────── 검색 ─────────
 
-export function SearchBox({ value, onChangeText, onSubmit, placeholder }: { value: string; onChangeText: (t: string) => void; onSubmit?: () => void; placeholder?: string }) {
+export function SearchBox({ value, onChangeText, onSubmit, placeholder, autoFocus }: { value: string; onChangeText: (t: string) => void; onSubmit?: () => void; placeholder?: string; autoFocus?: boolean }) {
   return (
     <View style={s.searchBox}>
       <Icon name="search" size={20} color="#7c8984" />
@@ -240,6 +240,7 @@ export function SearchBox({ value, onChangeText, onSubmit, placeholder }: { valu
         onChangeText={onChangeText}
         onSubmitEditing={onSubmit}
         returnKeyType="search"
+        autoFocus={autoFocus}
         placeholder={placeholder}
         placeholderTextColor="#9aa5a1"
         style={s.searchInput}

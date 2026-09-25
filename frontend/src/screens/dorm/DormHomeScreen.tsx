@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ApiError } from '../../api/client';
 import { dormAccountApi, foodMenuApi, leaveApi, noticeApi, spointApi } from '../../api/dorm';
-import type { FoodMenuDay } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/Feedback';
 import Icon, { IconName } from '../../components/Icon';
@@ -10,19 +9,8 @@ import { ErrorView, LoadingView, PageHeader, Screen } from '../../components/ui'
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
-import { parseLocalDate } from '../../utils/format';
 import DormLinkForm from './DormLinkForm';
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
-/** 식단 응답의 date 포맷이 사이트에 따라 달라서 날짜 → 요일 순으로 오늘을 찾음 */
-export function findToday(days: FoodMenuDay[]): FoodMenuDay | undefined {
-  const today = new Date();
-  return (
-    days.find((d) => parseLocalDate(d.date)?.toDateString() === today.toDateString()) ??
-    days.find((d) => d.dayOfWeek?.startsWith(WEEKDAYS[today.getDay()]))
-  );
-}
+import { findToday, mealPreview } from './foodMenu';
 
 export default function DormHomeScreen({ navigation }: ScreenProps<'DormHome'>) {
   const { dormLinked, setDormLinked } = useAuth();
@@ -53,7 +41,7 @@ export default function DormHomeScreen({ navigation }: ScreenProps<'DormHome'>) 
   if (!dormLinked) {
     return (
       <Screen bg="white">
-        <PageHeader eyebrow="생활관 서비스를 한곳에서" title="기숙사생활" />
+        <PageHeader title="기숙사생활" />
         <DormLinkForm onLinked={() => {}} />
       </Screen>
     );
@@ -75,21 +63,20 @@ function LinkedHome({ navigation }: { navigation: ScreenProps<'DormHome'>['navig
     return { profile: ok(profile), menu: ok(menu), notices: ok(notices), spoint: ok(spoint) };
   }, []);
 
-  const today = data?.menu ? findToday(data.menu.days) : undefined;
-  const lunch = today?.lunch?.[0] ?? today?.combinedMeal?.[0];
-  const hour = new Date().getHours();
-  const dinner = today?.dinner?.[0];
-  const mealLine = hour >= 14 && dinner ? `오늘 저녁은 ${dinner}` : lunch ? `오늘 점심은 ${lunch}` : '오늘의 식단 보기';
+  const preview = mealPreview(data?.menu ? findToday(data.menu.days) : undefined);
+  const residentInfo = data?.profile ? [[data.profile.room, data.profile.seat].filter(Boolean).join(' '), data.profile.applicantName].filter(Boolean).join(' · ') : null;
   const latestScore = data?.spoint?.yearlyTotals?.[0];
 
   return (
     <Screen>
       <PageHeader
-        eyebrow="생활관 서비스를 한곳에서"
         title="기숙사생활"
         right={
-          <View style={styles.linkedBadge}>
-            <Text style={styles.linkedBadgeText}>계정 연동됨</Text>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <View style={styles.linkedBadge}>
+              <Text style={styles.linkedBadgeText}>계정 연동됨</Text>
+            </View>
+            {!!residentInfo && <Text style={styles.residentInfo} numberOfLines={1}>{residentInfo}</Text>}
           </View>
         }
       />
@@ -97,20 +84,27 @@ function LinkedHome({ navigation }: { navigation: ScreenProps<'DormHome'>['navig
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 35 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
       >
-        <View style={styles.resident}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.residentRoom}>{data?.profile ? `${data.profile.room} · ${data.profile.seat}` : '숭실대학교 생활관'}</Text>
-            <Text style={styles.residentName}>{data?.profile ? `${data.profile.applicantName}님, 안녕하세요` : '안녕하세요'}</Text>
-            <Pressable style={styles.mealPill} onPress={() => navigation.navigate('FoodMenu')}>
-              <Icon name="meal" size={15} color="white" />
-              <Text style={styles.mealPillText} numberOfLines={1}>{mealLine}</Text>
-              <Icon name="chevron" size={13} color="white" />
-            </Pressable>
+        <Pressable style={styles.meal} onPress={() => navigation.navigate('FoodMenu')}>
+          <View style={styles.mealHead}>
+            <Icon name="meal" size={16} color="white" />
+            <Text style={styles.mealLabel}>
+              {preview.kind === 'none' ? '오늘의 식단' : `오늘의 ${preview.label === '오늘' ? '식단' : preview.label}`}
+            </Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.mealMore}>전체 식단</Text>
+            <Icon name="chevron" size={13} color="rgba(255,255,255,0.85)" />
           </View>
-          <View style={styles.building}>
-            <Icon name="dorm" size={45} color="white" />
-          </View>
-        </View>
+          {preview.kind === 'menu' ? (
+            <Text style={styles.mealMenu} numberOfLines={3}>{preview.items.join(' · ')}</Text>
+          ) : preview.kind === 'closed' ? (
+            <>
+              <Text style={styles.mealClosed}>{preview.label === '오늘' ? '오늘은 식당을 운영하지 않아요' : `${preview.label}은 미운영이에요`}</Text>
+              {!!preview.notice && <Text style={styles.mealNotice} numberOfLines={2}>{preview.notice}</Text>}
+            </>
+          ) : (
+            <Text style={styles.mealClosed}>{data ? (data.menu ? '오늘의 식단 정보가 없어요' : '식단을 불러오지 못했어요') : '식단을 불러오는 중…'}</Text>
+          )}
+        </Pressable>
 
         <Text style={styles.menuTitle}>자주 찾는 서비스</Text>
         <View style={styles.grid}>
@@ -120,7 +114,6 @@ function LinkedHome({ navigation }: { navigation: ScreenProps<'DormHome'>['navig
           <GridItem icon="chat" tone="blue" title="일반 문의 · 상담" sub="비밀글 가능" onPress={() => navigation.navigate('InquiryList')} />
         </View>
 
-        <QuickRow icon="meal" title="오늘의 식단" sub="조식 · 중식 · 석식" onPress={() => navigation.navigate('FoodMenu')} />
         <QuickRow icon="doc" title="입사신청 / 선발내역" sub="모집구분 · 선발여부 · 거주기간" onPress={() => navigation.navigate('IpsaList')} />
 
         <View style={styles.notice}>
@@ -191,12 +184,14 @@ function QuickRow({ icon, title, sub, onPress }: { icon: IconName; title: string
 const styles = StyleSheet.create({
   linkedBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 15, backgroundColor: '#e0f1f5' },
   linkedBadgeText: { color: colors.primaryDark, fontSize: font.xs, fontWeight: '700' },
-  resident: { minHeight: 146, padding: 21, flexDirection: 'row', borderRadius: 22, backgroundColor: '#3f93b0', overflow: 'hidden' },
-  residentRoom: { marginBottom: 8, fontSize: font.sm, color: 'rgba(255,255,255,0.8)' },
-  residentName: { marginBottom: 10, fontSize: 19, fontWeight: '800', color: 'white' },
-  mealPill: { alignSelf: 'flex-start', maxWidth: 230, height: 32, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.17)' },
-  mealPillText: { flexShrink: 1, color: 'white', fontSize: font.xs },
-  building: { width: 86, height: 86, alignSelf: 'center', borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '5deg' }] },
+  residentInfo: { maxWidth: 170, color: colors.textSub, fontSize: font.xs },
+  meal: { minHeight: 120, padding: 20, borderRadius: 22, backgroundColor: '#3f93b0' },
+  mealHead: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mealLabel: { color: 'white', fontSize: font.md, fontWeight: '800' },
+  mealMore: { color: 'rgba(255,255,255,0.85)', fontSize: font.xs },
+  mealMenu: { color: 'white', fontSize: 16, lineHeight: 24, fontWeight: '700' },
+  mealClosed: { color: 'white', fontSize: 16, fontWeight: '700' },
+  mealNotice: { marginTop: 6, color: 'rgba(255,255,255,0.8)', fontSize: font.xs, lineHeight: 17 },
   menuTitle: { marginTop: 24, marginBottom: 12, fontSize: 17, fontWeight: '800', color: colors.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   gridItem: { width: '48.5%', height: 124, padding: 14, borderWidth: 1, borderColor: '#e8edeb', borderRadius: 18, backgroundColor: 'white' },

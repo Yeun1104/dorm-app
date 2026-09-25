@@ -25,7 +25,6 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
   return (
     <Screen>
       <PageHeader
-        eyebrow="나의 숭팔이"
         title="마이페이지"
         right={
           <Pressable onPress={() => navigation.navigate('Settings')} hitSlop={8}>
@@ -78,7 +77,7 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
           ))}
         </View>
 
-        <Text style={styles.version}>숭팔이 v1.0.0 · 숭실대 기숙사 생활의 든든한 친구</Text>
+        <Text style={styles.version}>숭팔이 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
       </ScrollView>
     </Screen>
   );
@@ -86,7 +85,7 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
 
 const styles = StyleSheet.create({
   settings: { color: '#75807c', fontSize: font.md },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 20, borderRadius: 21, backgroundColor: '#e6f3f6' },
+  profileCard: { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 20, borderWidth: 1, borderColor: colors.border, borderRadius: 21, backgroundColor: 'white' },
   name: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 3 },
   sub: { marginBottom: 9, color: '#6f7c77', fontSize: font.sm },
   activity: { marginVertical: 14, paddingVertical: 17, paddingHorizontal: 5, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white' },
