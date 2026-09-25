@@ -57,8 +57,14 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
 
             addRefreshTokenToCookie(response, refreshToken);
 
+            // ⚠️ refreshToken 쿠키는 이 요청을 처리한 인앱브라우저(WebView)에만 저장되고, 앱의 자체
+            // HTTP 클라이언트(axios 등)는 그 쿠키 저장소에 접근할 수 없어서 재발급을 못 받는 문제가 있었음
+            // (실제로 1시간마다 재로그인해야 하는 원인). accessToken처럼 refreshToken도 리다이렉트 URL에
+            // 같이 실어서, 앱이 딥링크로 직접 받아 SecureStore 등에 저장해뒀다가 /api/auth/refresh 호출 시
+            // body로 보내도록 바꿈 (쿠키는 웹 클라이언트를 위해 그대로 유지함).
             String redirectUrl = UriComponentsBuilder.fromUriString(authorizedRedirectUri)
                     .queryParam("access_token", accessToken)
+                    .queryParam("refresh_token", refreshToken)
                     .build().toUriString();
             response.sendRedirect(redirectUrl);
         }

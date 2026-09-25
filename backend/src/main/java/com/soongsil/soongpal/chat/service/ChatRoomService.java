@@ -2,7 +2,6 @@ package com.soongsil.soongpal.chat.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soongsil.soongpal.board.domain.Board;
-import com.soongsil.soongpal.board.domain.BoardCategory;
 import com.soongsil.soongpal.board.repository.BoardRepository;
 import com.soongsil.soongpal.chat.domain.ChatMessage;
 import com.soongsil.soongpal.chat.domain.ChatRole;
@@ -37,6 +36,10 @@ import java.util.stream.Collectors;
 import static com.soongsil.soongpal.chat.domain.ChatRoomType.GROUP;
 import static com.soongsil.soongpal.chat.domain.ChatRoomType.PRIVATE;
 
+/**
+ * ⚠️ 리팩터링 예정: GROUP(단체) 채팅방 생성/참가(createGroupChatRoom, joinChatRoom)는
+ * 공동구매도 1:1 채팅으로 바뀌면서 지금은 안 쓰이지만, 사전공구 등 나중을 위해 일단 남겨둠.
+ */
 @Slf4j
 @Transactional
 @Service
@@ -130,12 +133,13 @@ public class ChatRoomService {
 
         ChatMessage lastMessage = chatMessageRepository.findLastMessageByRoomId(chatRoom.getId()).orElse(null);
         String lastContent = lastMessage != null ? lastMessage.getContent() : null;
+        Long lastMessageId = lastMessage != null ? lastMessage.getId() : null;
         LocalDateTime lastCreatedAt = lastMessage != null ? lastMessage.getCreatedAt() : chatRoom.getCreatedAt();
 
-        if (findBoard.getCategory() == BoardCategory.USED) {
-            return ChatRoomResDto.of(chatRoom, findBoard.getUser().getNickName(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
-        }
-        return ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
+        Integer unreadCount = calculateUnreadCount(roomId, userId);
+
+        return ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
+                users, lastContent, lastMessageId, lastCreatedAt, unreadCount);
     }
 
     public List<ChatRoomResDto> getChatRoomsByUser(Long userId) {
@@ -203,16 +207,26 @@ public class ChatRoomService {
 
                             LastMessageDto lastMessage = lastMessageMap.get(c.getId());
                             String lastContent = lastMessage != null ? lastMessage.content() : null;
+                            Long lastMessageId = lastMessage != null ? lastMessage.messageId() : null;
                             LocalDateTime lastCreatedAt = lastMessage != null ? lastMessage.createdAt() : c.getCreatedAt();
 
-                            if (findBoard.getCategory() == BoardCategory.USED) {
-                                return ChatRoomResDto.of(c, findBoard.getUser().getNickName(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
-                            }
-                            return ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(), users, lastContent, lastCreatedAt);
+                            Integer unreadCount = calculateUnreadCount(c.getId(), userId);
+
+                            return ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
+                                    users, lastContent, lastMessageId, lastCreatedAt, unreadCount);
                         })
                 )
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    /** 이 방에서 내가 안 보낸(=상대가 보낸) 메시지 중, 내가 마지막으로 읽은 메시지보다 나중에 온 것들의 개수. */
+    private Integer calculateUnreadCount(Long roomId, Long userId) {
+        Long lastReadMessageId = chatRoomUserRepository.findByChatRoomIdAndUserId(roomId, userId)
+                .map(ChatRoomUser::getLastReadMessageId)
+                .orElse(null);
+        long sinceId = lastReadMessageId != null ? lastReadMessageId : 0L;
+        return (int) chatMessageRepository.countByChatRoom_IdAndIdGreaterThanAndSender_IdNot(roomId, sinceId, userId);
     }
 
     public ChatRoomResDto joinChatRoom(Long boardId, Long userId) {
@@ -291,6 +305,6 @@ public class ChatRoomService {
     }
 
     private LastMessageDto toLastMessageDto(LastMessageProjection projection) {
-        return new LastMessageDto(projection.getRoomId(), projection.getContent(), projection.getCreatedAt());
+        return new LastMessageDto(projection.getRoomId(), projection.getMessageId(), projection.getContent(), projection.getCreatedAt());
     }
 }

@@ -27,17 +27,26 @@ public class BoardUpdateReqDto {
     @NotBlank
     private String content;
 
-    @Schema(description = "제품 가격", example = "12000")
+    @Schema(description = "전체 결제 금액 (배송비 포함)", example = "15000")
     @NotNull
-    @Min(value = 0)
-    private Integer price;
+    @Min(value = 1)
+    private Integer totalPrice;
+
+    @Schema(description = "전체 상품 개수", example = "30")
+    @NotNull
+    @Min(value = 1)
+    private Integer totalQuantity;
+
+    @Schema(description = "1인당 최소 구매 수량 (선택 사항)", example = "2")
+    @Min(value = 1)
+    private Integer minPurchaseQuantity;
 
     @Schema(description = "수정할 관련 웹 페이지 URL (선택 사항)", example = "http://new.example.com/link")
     private String url;
-    @Schema(description = "수정할 모임 장소 또는 거래 위치 (선택 사항)", example = "숭실대학교 한경직 기념관")
+    @Schema(description = "수정할 수령 장소 (선택 사항)", example = "숭실대학교 한경직 기념관")
     private String location;
 
-    @Schema(description = "수정할 게시글 상태", example = "USED", allowableValues = {"GROUP", "USED"})
+    @Schema(description = "수정할 게시글 상태", example = "GROUP", allowableValues = {"GROUP"})
     @NotNull
     private BoardCategory category;
 }

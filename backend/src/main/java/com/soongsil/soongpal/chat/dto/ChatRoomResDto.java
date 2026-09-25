@@ -24,9 +24,18 @@ public class ChatRoomResDto {
     private int userCount;
     private List<ChatRoomUserResDto> users;
     private String lastMessage;
+    private Long lastMessageId;
     private LocalDateTime lastMessageTime;
+    private Integer unreadCount; // 이 방에서 내가 안 읽은 메시지 개수 (뱃지용)
 
-    public static ChatRoomResDto of(ChatRoom chatRoom, String name, Long boardId, String productTitle, List<ChatRoomUserResDto> users, String lastMessage, LocalDateTime lastMessageTime) {
+    public static ChatRoomResDto of(ChatRoom chatRoom, String name, Long boardId, String productTitle,
+                                     List<ChatRoomUserResDto> users, String lastMessage, LocalDateTime lastMessageTime) {
+        return of(chatRoom, name, boardId, productTitle, users, lastMessage, null, lastMessageTime, null);
+    }
+
+    public static ChatRoomResDto of(ChatRoom chatRoom, String name, Long boardId, String productTitle,
+                                     List<ChatRoomUserResDto> users, String lastMessage, Long lastMessageId,
+                                     LocalDateTime lastMessageTime, Integer unreadCount) {
         return ChatRoomResDto.builder()
                 .id(chatRoom.getId())
                 .name(name)
@@ -36,7 +45,9 @@ public class ChatRoomResDto {
                 .userCount(chatRoom.getChatRoomUsers().size())
                 .users(users)
                 .lastMessage(lastMessage)
+                .lastMessageId(lastMessageId)
                 .lastMessageTime(lastMessageTime)
+                .unreadCount(unreadCount)
                 .build();
     }
 }

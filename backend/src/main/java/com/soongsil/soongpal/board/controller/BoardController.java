@@ -49,7 +49,7 @@ public class BoardController {
     @ApiResponse(responseCode = "200", description = "게시글 조회 성공", content = @Content(schema = @Schema(implementation = CommonResDto.class)))
     @Operation(method = "GET", summary = "게시글 목록 조회 및 필터링", description = "모든 게시글 또는 'keyword', 'category', 'status' 파라미터를 조합해 게시글을 조회합니다. 파라미터가 없으면 모든 게시글을 조회합니다.")
     @Parameter(name = "keyword", description = "조회할 게시글의 제목 (선택 사항)", required = false)
-    @Parameter(name = "category", description = "조회할 게시글의 카테고리 (GROUP 또는 USED) (선택 사항)", required = false)
+    @Parameter(name = "category", description = "조회할 게시글의 카테고리 (GROUP) (선택 사항)", required = false)
     @Parameter(name = "status", description = "조회할 게시글의 거래 상태 (IN_PROGRESS 또는 COMPLETED) (선택 사항)", required = false)
     @Parameter(name = "page", description = "조회할 페이지 번호 (0부터 시작, 기본값: 0)", example = "0")
     public ResponseEntity<CommonResDto<BoardPageResDto>> getBoards(

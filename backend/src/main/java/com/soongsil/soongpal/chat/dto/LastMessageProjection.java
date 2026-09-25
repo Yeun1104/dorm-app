@@ -6,6 +6,8 @@ public interface LastMessageProjection {
 
     Long getRoomId();
 
+    Long getMessageId();
+
     String getContent();
 
     LocalDateTime getCreatedAt();

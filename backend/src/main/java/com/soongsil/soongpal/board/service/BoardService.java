@@ -5,12 +5,13 @@ import com.soongsil.soongpal.board.dto.*;
 import com.soongsil.soongpal.board.repository.BoardImageRepository;
 import com.soongsil.soongpal.board.repository.BoardRepository;
 import com.soongsil.soongpal.board.repository.LikeRepository;
-import com.soongsil.soongpal.chat.service.ChatRoomService;
 import com.soongsil.soongpal.common.exception.BoardErrorCode;
 import com.soongsil.soongpal.common.exception.BoardException;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
 import com.soongsil.soongpal.common.file.S3Uploader;
+import com.soongsil.soongpal.reservation.domain.ReservationStatus;
+import com.soongsil.soongpal.reservation.repository.ReservationRepository;
 import com.soongsil.soongpal.user.domain.User;
 import com.soongsil.soongpal.user.repository.UserRepository;
 import jakarta.validation.Valid;
@@ -37,9 +38,9 @@ public class BoardService {
     private final BoardRepository boardRepository;
     private final LikeRepository likeRepository;
     private final UserRepository userRepository;
-    private final ChatRoomService chatRoomService;
     private final S3Uploader s3Uploader;
     private final BoardImageRepository boardImageRepository;
+    private final ReservationRepository reservationRepository;
 
     @Transactional
     public BoardResDto createBoard(BoardCreateReqDto boardCreateReqDto, List<MultipartFile> images, Long userId) {
@@ -52,6 +53,14 @@ public class BoardService {
         }
 
         User findUser = getUser(userId);
+        if (findUser.isCurrentlyRestricted()) {
+            throw new UserException(UserErrorCode.USER_SUSPENDED);
+        }
+        // 학교 계정(usaint) 인증된 사용자만 글쓰기 가능
+        if (!findUser.isSchoolVerified()) {
+            throw new UserException(UserErrorCode.SCHOOL_VERIFICATION_REQUIRED);
+        }
+
         Board board = BoardCreateReqDto.toEntity(boardCreateReqDto, findUser);
         Board savedBoard = boardRepository.save(board);
 
@@ -69,20 +78,16 @@ public class BoardService {
             }
         }
 
-        if (savedBoard.getCategory() == BoardCategory.GROUP) {
-            chatRoomService.createGroupChatRoom(userId, boardCreateReqDto.getTitle(), savedBoard.getId());
-        }
-
-        return BoardResDto.from(board, 0, false);
+        // ⚠️ 예전엔 여기서 GROUP 카테고리면 단체채팅방을 자동으로 열었는데, 이제 공동구매도 1:1 채팅만 쓰기로 해서
+        // 글쓰기 시점엔 채팅방을 안 만듦. 구매자가 참여요청을 보내고, 방장이 수락해야 1:1 채팅방이 생김.
+        return BoardResDto.from(board, 0, false, savedBoard.getTotalQuantity(), 0);
     }
 
     public BoardResDto getBoardById(Long id, Long userId) {
         Board findBoard = boardRepository.findById(id)
                 .orElseThrow(() -> new BoardException(BoardErrorCode.BOARD_NOT_FOUND));
 
-        Integer likeCount = likeRepository.countByBoardId(findBoard.getId());
-        boolean liked = likeRepository.existsByBoardIdAndUserId(findBoard.getId(), userId);
-        return BoardResDto.from(findBoard, likeCount, liked);
+        return toBoardResDto(findBoard, userId);
     }
 
     @Transactional
@@ -108,7 +113,9 @@ public class BoardService {
         findBoard.update(
                 boardUpdateReqDto.getTitle(),
                 boardUpdateReqDto.getContent(),
-                boardUpdateReqDto.getPrice(),
+                boardUpdateReqDto.getTotalPrice(),
+                boardUpdateReqDto.getTotalQuantity(),
+                boardUpdateReqDto.getMinPurchaseQuantity(),
                 boardUpdateReqDto.getUrl(),
                 boardUpdateReqDto.getLocation(),
                 boardUpdateReqDto.getCategory()
@@ -141,9 +148,7 @@ public class BoardService {
             }
         }
 
-        Integer likeCount = likeRepository.countByBoardId(findBoard.getId());
-        boolean liked = likeRepository.existsByBoardIdAndUserId(findBoard.getId(), userId);
-        return BoardResDto.from(findBoard, likeCount, liked);
+        return toBoardResDto(findBoard, userId);
     }
 
     @Transactional
@@ -159,9 +164,7 @@ public class BoardService {
 
         findBoard.updateStatus(statusUpdateDto.getStatus());
 
-        Integer likeCount = likeRepository.countByBoardId(findBoard.getId());
-        boolean liked = likeRepository.existsByBoardIdAndUserId(findBoard.getId(), userId);
-        return BoardResDto.from(findBoard, likeCount, liked);
+        return toBoardResDto(findBoard, userId);
     }
 
     @Transactional
@@ -200,7 +203,7 @@ public class BoardService {
             boardsPage = boardRepository.findAll(pageable);
         }
 
-        Page<BoardResDto> boardPageResDto = boardsPage.map(board -> BoardResDto.from(board, likeRepository.countByBoardId(board.getId()), likeRepository.existsByBoardIdAndUserId(board.getId(), userId) ));
+        Page<BoardResDto> boardPageResDto = boardsPage.map(board -> toBoardResDto(board, userId));
         return BoardPageResDto.from(boardPageResDto);
     }
 
@@ -243,6 +246,22 @@ public class BoardService {
     private User getUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+    }
+
+    private BoardResDto toBoardResDto(Board board, Long userId) {
+        Integer likeCount = likeRepository.countByBoardId(board.getId());
+        boolean liked = likeRepository.existsByBoardIdAndUserId(board.getId(), userId);
+        Integer remaining = calculateRemainingQuantity(board);
+        Integer waitingCount = (int) reservationRepository.countByBoardIdAndStatus(board.getId(), ReservationStatus.PENDING);
+        return BoardResDto.from(board, likeCount, liked, remaining, waitingCount);
+    }
+
+    private Integer calculateRemainingQuantity(Board board) {
+        if (board.getTotalQuantity() == null) {
+            return null;
+        }
+        int held = reservationRepository.sumHeldQuantityByBoardId(board.getId());
+        return Math.max(board.getTotalQuantity() - held, 0);
     }
 
     @Transactional
