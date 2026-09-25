@@ -17,22 +17,12 @@ function jsonPart(value: unknown): Blob {
     : ({ string: json, type: 'application/json' } as unknown as Blob);
 }
 
-/**
- * 이미지 파일 파트 추가.
- * 웹에서는 { uri, name, type } 객체가 파일로 인식되지 않아서(문자열 "[object Object]"로 전송됨) blob으로 변환해서 붙임.
- * 서버(S3Uploader)가 파일명에서 확장자를 잘라 쓰므로 확장자가 없으면 mimeType으로 붙여줌.
- */
-async function appendImage(form: FormData, field: string, img: LocalImage, index: number) {
-  const type = img.mimeType ?? 'image/jpeg';
-  let name = img.fileName ?? `image_${index}`;
-  if (!/\.\w+$/.test(name)) name += `.${type.split('/')[1] ?? 'jpg'}`;
-
-  if (Platform.OS === 'web') {
-    const blob = await (await fetch(img.uri)).blob();
-    form.append(field, blob, name);
-  } else {
-    form.append(field, { uri: img.uri, name, type } as unknown as Blob);
-  }
+function appendImage(form: FormData, field: string, img: LocalImage, index: number) {
+  form.append(field, {
+    uri: img.uri,
+    name: img.fileName ?? `image_${index}.jpg`,
+    type: img.mimeType ?? 'image/jpeg',
+  } as unknown as Blob);
 }
 
 async function sendMultipart(method: 'post' | 'put', url: string, form: FormData): Promise<Board> {
@@ -62,7 +52,7 @@ export const boardApi = {
   async create(body: BoardCreateReq, images: LocalImage[]): Promise<Board> {
     const form = new FormData();
     form.append('board', jsonPart(body));
-    for (const [i, img] of images.entries()) await appendImage(form, 'images', img, i);
+    images.forEach((img, i) => appendImage(form, 'images', img, i));
     return sendMultipart('post', '/api/board', form);
   },
 
@@ -75,7 +65,7 @@ export const boardApi = {
   async update(id: number, body: BoardCreateReq, newImages: LocalImage[], deleteImageIds: number[]): Promise<Board> {
     const form = new FormData();
     form.append('board', jsonPart(body));
-    for (const [i, img] of newImages.entries()) await appendImage(form, 'newImages', img, i);
+    newImages.forEach((img, i) => appendImage(form, 'newImages', img, i));
     if (deleteImageIds.length) form.append('deleteImageIds', jsonPart(deleteImageIds));
     return sendMultipart('put', `/api/board/${id}`, form);
   },

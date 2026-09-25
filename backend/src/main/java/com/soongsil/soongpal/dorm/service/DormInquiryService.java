@@ -202,9 +202,18 @@ public class DormInquiryService {
             throw new DormException(DormErrorCode.INQUIRY_NOT_OWNER);
         }
         InquiryFormDefaultsDto profile = getFormDefaults(userId);
-        if (!profile.writerName().equals(detail.writer())) {
+        if (!sameName(profile.writerName(), detail.writer())) {
             throw new DormException(DormErrorCode.INQUIRY_NOT_OWNER);
         }
+    }
+
+    /** 사이트 HTML의 &nbsp;/공백 차이 때문에 같은 이름이 다르게 비교되지 않도록 공백을 모두 제거하고 비교 */
+    private boolean sameName(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        String na = a.replaceAll("[\\s\\u00a0]", "");
+        return !na.isEmpty() && na.equals(b.replaceAll("[\\s\\u00a0]", ""));
     }
 
     private String normalizeLineBreaks(String content) {

@@ -31,8 +31,7 @@ export type AppStackParamList = {
   DormLink: undefined;
   LeaveList: { kind: LeaveKind };
   LeaveDetail: { kind: LeaveKind; no: number };
-  /** editNo가 있으면 기존 신청을 수정(삭제 후 재신청) */
-  LeaveForm: { kind: LeaveKind; editNo?: number };
+  LeaveForm: { kind: LeaveKind };
   RepairList: undefined;
   RepairDetail: { no: number };
   RepairForm: { no?: number };

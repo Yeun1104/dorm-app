@@ -37,7 +37,9 @@ const META: Record<Kind, { title: string; subtitle: string; empty: string }> = {
 const listFn = { repair: repairApi.list, notice: noticeApi.list, inquiry: inquiryApi.list };
 
 /** 작성자 판별: 상세의 writer가 폼 기본값(내 기숙사 프로필 이름)과 같으면 본인 글 */
-const isMine = (writer: string | undefined, myName: string | undefined) => !!writer && !!myName && writer.trim() === myName.trim();
+/** 사이트 HTML의 공백/&nbsp; 차이로 같은 이름이 다르게 비교되지 않도록 공백을 모두 제거하고 비교 (서버 assertOwner와 동일 규칙) */
+const normalizeName = (name: string | undefined) => (name ?? '').replace(/[\s\u00a0]/g, '');
+const isMine = (writer: string | undefined, myName: string | undefined) => !!normalizeName(writer) && normalizeName(writer) === normalizeName(myName);
 
 // ───────── 목록 (공통) ─────────
 

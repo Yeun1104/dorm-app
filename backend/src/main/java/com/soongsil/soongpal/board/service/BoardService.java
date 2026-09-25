@@ -140,9 +140,6 @@ public class BoardService {
         if (newImages != null && !newImages.isEmpty()) {
             for (MultipartFile imageFile : newImages) {
                 String imageUrl = s3Uploader.uploadFile(imageFile, "board");
-                if (imageUrl == null) {
-                    continue; // S3 비활성화 등으로 업로드 스킵된 경우 (createBoard와 동일하게 처리)
-                }
                 BoardImage newBoardImage = BoardImage.builder()
                         .imageUrl(imageUrl)
                         .board(findBoard)
