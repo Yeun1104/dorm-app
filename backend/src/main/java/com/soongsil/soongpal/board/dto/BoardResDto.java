@@ -2,11 +2,9 @@ package com.soongsil.soongpal.board.dto;
 
 import com.soongsil.soongpal.board.domain.Board;
 import com.soongsil.soongpal.board.domain.BoardCategory;
-import com.soongsil.soongpal.board.domain.BoardImage;
 import com.soongsil.soongpal.board.domain.BoardStatus;
 import lombok.Builder;
 import lombok.Getter;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,7 +12,6 @@ import java.util.stream.Collectors;
 
 @Getter
 @Builder
-@Transactional(readOnly = true)
 public class BoardResDto {
     private Long id;
     private String title;
