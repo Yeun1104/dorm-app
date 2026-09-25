@@ -70,7 +70,7 @@ public class ChatService {
 
     private void updateLastMessageCache(Long roomId, String content, ChatMessage savedMessage) {
         try {
-            LastMessageDto dto = new LastMessageDto(roomId, content, savedMessage.getCreatedAt());
+            LastMessageDto dto = new LastMessageDto(roomId, savedMessage.getId(), content, savedMessage.getCreatedAt());
             redisTemplate.opsForValue().set(
                     "chat:room:" + roomId + ":last-message",
                     objectMapper.writeValueAsString(dto)
