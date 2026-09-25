@@ -3,11 +3,12 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 import { foodMenuApi, ipsaApi, spointApi } from '../../api/dorm';
 import type { FoodMenuDay, FoodMenuWeekNav, IpsaListItem, SpointItem } from '../../api/types';
 import Icon from '../../components/Icon';
-import { Chip, EmptyState, ErrorView, LoadingView, Screen, SubHeader } from '../../components/ui';
+import { BottomSheet, Chip, EmptyState, ErrorView, LoadingView, Screen, SubHeader } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
-import { dayClosure, findToday, isClosedText } from './foodMenu';
+import { parseLocalDate } from '../../utils/format';
+import { dayClosure, findToday, menuItems } from './foodMenu';
 import { dormStatusTone } from './dormShared';
 
 // ───────── 상벌점조회 ─────────
@@ -135,39 +136,70 @@ export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
 
 // ───────── 식단 ─────────
 
-// 조식은 운영하지 않아서 표시하지 않음 (조식 칸은 운영 안내 공지로만 쓰임 → dayClosure에서 사용)
+// 조식은 운영하지 않아서 표시하지 않음 (조식 칸은 운영 안내 공지로만 쓰임)
 const MEALS: { key: keyof Pick<FoodMenuDay, 'lunch' | 'dinner' | 'combinedMeal'>; label: string; optional?: boolean }[] = [
   { key: 'lunch', label: '중식' },
   { key: 'dinner', label: '석식' },
   { key: 'combinedMeal', label: '일품', optional: true },
 ];
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toYmd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
   const [week, setWeek] = useState<FoodMenuWeekNav | null>(null);
   const { data, error, loading, reload } = useFetch(() => foodMenuApi.get(week), [week]);
   const [dayIndex, setDayIndex] = useState(0);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const initialWeek = useRef(true);
+  /** 달력에서 고른 날짜(YYYY-MM-DD) — 그 주를 불러온 뒤 그 날을 선택 */
+  const target = useRef<string | null>(null);
 
-  // 이번 주를 처음 열었을 때는 오늘 요일을 선택
+  const indexOfDate = (ymd: string) => data?.days.findIndex((d) => (parseLocalDate(d.date) ? toYmd(parseLocalDate(d.date)!) : '') === ymd) ?? -1;
+
+  // 이번 주를 처음 열었을 때는 오늘 요일, 달력으로 이동했으면 고른 날짜를 선택
   useEffect(() => {
     if (!data) return;
-    if (initialWeek.current) {
+    if (target.current) {
+      const i = indexOfDate(target.current);
+      setDayIndex(i >= 0 ? i : 0);
+      target.current = null;
+    } else if (initialWeek.current) {
       const today = findToday(data.days);
       setDayIndex(today ? data.days.indexOf(today) : 0);
-      initialWeek.current = false;
     } else {
       setDayIndex(0);
     }
+    initialWeek.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
+
+  const pickDate = (d: Date) => {
+    setCalendarOpen(false);
+    const ymd = toYmd(d);
+    const i = indexOfDate(ymd);
+    if (i >= 0) return setDayIndex(i); // 이미 보고 있는 주
+    target.current = ymd;
+    setWeek({ gyear: String(d.getFullYear()), gmonth: pad2(d.getMonth() + 1), gday: pad2(d.getDate()) });
+  };
 
   const day = data?.days[dayIndex];
   const closure = dayClosure(day);
   // 중식/석식은 비어 있어도 '미운영'으로 칸을 보여주고, 일품은 있을 때만
-  const meals = day ? MEALS.filter((m) => !m.optional || day[m.key]?.length) : [];
+  const meals = day ? MEALS.filter((m) => !m.optional || menuItems(day[m.key]).length) : [];
+  const todayYmd = toYmd(new Date());
 
   return (
     <Screen bg={colors.bgSub}>
-      <SubHeader title="식단" subtitle={data?.weekLabel} />
+      <SubHeader
+        title="식단"
+        subtitle={data?.weekLabel}
+        action={
+          <Pressable style={styles.calendarBtn} onPress={() => setCalendarOpen(true)} hitSlop={6}>
+            <Icon name="calendar" size={20} color={colors.text} />
+          </Pressable>
+        }
+      />
       <View style={styles.weekNav}>
         <Pressable style={[styles.weekBtn, !data?.prevWeek && { opacity: 0.4 }]} disabled={!data?.prevWeek || loading} onPress={() => setWeek(data!.prevWeek)}>
           <Icon name="back" size={18} />
@@ -183,42 +215,104 @@ export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
       ) : error || !data ? (
         <ErrorView message={error ?? '식단을 불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 28 }}>
           <View style={styles.dayTabs}>
-            {data.days.map((d, i) => (
-              <Pressable key={`${d.date}-${i}`} style={[styles.dayTab, i === dayIndex && styles.dayTabActive]} onPress={() => setDayIndex(i)}>
-                <Text style={[styles.dayTabWeek, i === dayIndex && { color: 'white' }]}>{d.dayOfWeek?.slice(0, 1)}</Text>
-                <Text style={[styles.dayTabDate, i === dayIndex && { color: 'white' }]}>{d.date?.replace(/\D/g, '').slice(-2)}</Text>
-              </Pressable>
-            ))}
+            {data.days.map((d, i) => {
+              const active = i === dayIndex;
+              const parsed = parseLocalDate(d.date);
+              const isToday = !!parsed && toYmd(parsed) === todayYmd;
+              return (
+                <Pressable key={`${d.date}-${i}`} style={styles.dayTab} onPress={() => setDayIndex(i)}>
+                  <Text style={[styles.dayTabWeek, isToday && { color: colors.primaryDark, fontWeight: '700' }]}>{d.dayOfWeek?.slice(0, 1)}</Text>
+                  <View style={[styles.dayCircle, active && styles.dayCircleActive]}>
+                    <Text style={[styles.dayTabDate, active && { color: 'white' }]}>{d.date?.replace(/\D/g, '').slice(-2)}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
 
           {!day || closure.closed ? (
             <EmptyState icon="meal" title="미운영" message={closure.notice ?? '이 날은 식당을 운영하지 않아요.'} />
           ) : (
-            <View style={styles.mealGrid}>
-              {meals.map((m, i) => (
-                <View key={m.key} style={styles.mealCard}>
-                  <View style={[styles.mealHead, i % 2 === 1 && { backgroundColor: colors.primaryDeep }]}>
-                    <Text style={styles.mealHeadText}>{m.label}</Text>
-                  </View>
-                  <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                    {!day[m.key]?.length || isClosedText(day[m.key]) ? (
-                      <Text style={[styles.menuItem, { color: colors.textMuted }]}>미운영</Text>
-                    ) : (
-                      day[m.key].map((menu, idx) => (
-                        <Text key={`${menu}-${idx}`} style={[styles.menuItem, idx < day[m.key].length - 1 && styles.menuDivider]}>{menu}</Text>
+            <View style={{ gap: 12 }}>
+              {meals.map((m) => {
+                const items = menuItems(day[m.key]);
+                return (
+                  <View key={m.key} style={styles.mealCard}>
+                    <View style={styles.mealHead}>
+                      <View style={styles.mealBar} />
+                      <Text style={styles.mealHeadText}>{m.label}</Text>
+                    </View>
+                    {items.length ? (
+                      items.map((menu, idx) => (
+                        <Text key={`${menu}-${idx}`} style={[styles.menuItem, idx === 0 && styles.menuMain]}>{menu}</Text>
                       ))
+                    ) : (
+                      <Text style={[styles.menuItem, { color: colors.textMuted }]}>미운영</Text>
                     )}
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
           <Text style={styles.allergy}>식단은 식자재 수급 상황에 따라 변경될 수 있어요. 알레르기가 있다면 원산지 및 알레르기 정보를 꼭 확인해주세요.</Text>
         </ScrollView>
       )}
+
+      <BottomSheet visible={calendarOpen} onClose={() => setCalendarOpen(false)}>
+        <Text style={styles.sheetTitle}>날짜 선택</Text>
+        <MonthCalendar selected={parseLocalDate(day?.date)} onPick={pickDate} />
+      </BottomSheet>
     </Screen>
+  );
+}
+
+const WEEK_HEAD = ['일', '월', '화', '수', '목', '금', '토'];
+
+/** 한 달 달력 (날짜 하나 선택) */
+function MonthCalendar({ selected, onPick }: { selected: Date | null; onPick: (d: Date) => void }) {
+  const [cursor, setCursor] = useState(() => {
+    const base = selected ?? new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  const cells: (Date | null)[] = [
+    ...Array.from({ length: cursor.getDay() }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(cursor.getFullYear(), cursor.getMonth(), i + 1)),
+  ];
+  const today = new Date().toDateString();
+  const move = (delta: number) => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+
+  return (
+    <View>
+      <View style={styles.calHead}>
+        <Pressable style={styles.weekBtn} onPress={() => move(-1)}>
+          <Icon name="back" size={18} />
+        </Pressable>
+        <Text style={styles.weekLabel}>{cursor.getFullYear()}년 {cursor.getMonth() + 1}월</Text>
+        <Pressable style={styles.weekBtn} onPress={() => move(1)}>
+          <Icon name="chevron" size={18} />
+        </Pressable>
+      </View>
+      <View style={styles.calGrid}>
+        {WEEK_HEAD.map((w, i) => (
+          <Text key={w} style={[styles.calCell, styles.calWeek, i === 0 && { color: colors.danger }]}>{w}</Text>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <View key={`e${i}`} style={styles.calCell} />;
+          const active = selected?.toDateString() === d.toDateString();
+          const isToday = d.toDateString() === today;
+          return (
+            <Pressable key={i} style={styles.calCell} onPress={() => onPick(d)}>
+              <View style={[styles.calCircle, isToday && styles.calToday, active && styles.dayCircleActive]}>
+                <Text style={[styles.calText, d.getDay() === 0 && { color: colors.danger }, active && { color: 'white', fontWeight: '700' }]}>{d.getDate()}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -246,16 +340,26 @@ const styles = StyleSheet.create({
   weekNav: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   weekBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: '#e1e6e4', backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
   weekLabel: { fontSize: font.base, fontWeight: '700', color: colors.text },
-  dayTabs: { marginBottom: 14, flexDirection: 'row', gap: 3 },
-  dayTab: { flex: 1, height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  dayTabActive: { backgroundColor: colors.primary },
+  calendarBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f2f5f3', alignItems: 'center', justifyContent: 'center' },
+  dayTabs: { marginBottom: 16, flexDirection: 'row' },
+  dayTab: { flex: 1, alignItems: 'center', gap: 6 },
   dayTabWeek: { fontSize: font.xs, color: '#7e8985' },
+  dayCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  dayCircleActive: { backgroundColor: colors.primary },
   dayTabDate: { fontSize: font.md, fontWeight: '700', color: colors.text },
-  mealGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  mealCard: { width: '48.5%', borderRadius: 9, borderWidth: 1, borderColor: '#e5ebe8', backgroundColor: 'white', overflow: 'hidden' },
-  mealHead: { paddingHorizontal: 11, paddingVertical: 11, backgroundColor: colors.primaryLight },
-  mealHeadText: { color: 'white', fontSize: 15, fontWeight: '800' },
-  menuItem: { paddingVertical: 6, color: '#4d5e65', fontSize: font.sm, lineHeight: 16 },
-  menuDivider: { borderBottomWidth: 1, borderBottomColor: '#eef1f2' },
-  allergy: { marginTop: 14, color: '#969e9b', fontSize: font.xs, lineHeight: 17 },
+  mealCard: { paddingHorizontal: 18, paddingVertical: 16, borderRadius: 18, borderWidth: 1, borderColor: '#e5ebe8', backgroundColor: 'white' },
+  mealHead: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mealBar: { width: 4, height: 16, borderRadius: 2, backgroundColor: colors.primary },
+  mealHeadText: { color: colors.primaryDeep, fontSize: 15, fontWeight: '800' },
+  menuItem: { paddingVertical: 4, color: colors.textBody, fontSize: font.base, lineHeight: 21 },
+  menuMain: { color: colors.text, fontWeight: '700' },
+  allergy: { marginTop: 'auto', paddingTop: 24, color: '#969e9b', fontSize: font.xs, lineHeight: 17, textAlign: 'center' },
+  sheetTitle: { marginBottom: 8, fontSize: 20, fontWeight: '800', color: colors.text },
+  calHead: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },
+  calCell: { width: `${100 / 7}%`, height: 44, alignItems: 'center', justifyContent: 'center' },
+  calWeek: { height: 28, textAlign: 'center', textAlignVertical: 'center', fontSize: font.xs, color: colors.textMuted },
+  calCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  calToday: { borderWidth: 1.5, borderColor: colors.primaryLight },
+  calText: { fontSize: font.md, color: colors.text },
 });

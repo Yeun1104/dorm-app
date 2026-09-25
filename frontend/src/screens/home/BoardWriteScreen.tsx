@@ -5,13 +5,14 @@ import { boardApi, LocalImage } from '../../api/board';
 import { errorMessage } from '../../api/client';
 import { useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { Button, ErrorView, Field, FormScroll, Input, LoadingView, Screen, SubHeader, Thumb } from '../../components/ui';
+import { BottomSheet, Button, ErrorView, Field, FormScroll, Input, LoadingView, Screen, SubHeader, Thumb } from '../../components/ui';
 import { MAX_BOARD_IMAGES } from '../../constants';
 import { invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { won } from '../../utils/format';
+import { CAMPUS_BUILDINGS, joinPlace, splitPlace } from '../../utils/place';
 
 const toInt = (s: string) => {
   const n = parseInt(s.replace(/[^0-9]/g, ''), 10);
@@ -32,7 +33,9 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
   const [totalPrice, setTotalPrice] = useState('');
   const [totalQuantity, setTotalQuantity] = useState('');
   const [minQty, setMinQty] = useState('');
-  const [location, setLocation] = useState('');
+  const [building, setBuilding] = useState('');
+  const [placeDetail, setPlaceDetail] = useState('');
+  const [buildingSheet, setBuildingSheet] = useState(false);
   const [url, setUrl] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +51,9 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
     setTotalPrice(String(b.totalPrice));
     setTotalQuantity(String(b.totalQuantity));
     setMinQty(b.minPurchaseQuantity != null ? String(b.minPurchaseQuantity) : '');
-    setLocation(b.location ?? '');
+    const place = splitPlace(b.location);
+    setBuilding(place.building);
+    setPlaceDetail(place.detail);
     setUrl(b.url ?? '');
     setPrefilled(true);
   }, [original.data, prefilled]);
@@ -101,7 +106,7 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
       totalPrice: price!,
       totalQuantity: qty!,
       minPurchaseQuantity: toInt(minQty) ?? undefined,
-      location: location.trim() || undefined,
+      location: joinPlace(building, placeDetail) || undefined,
       url: url.trim() || undefined,
       category: 'GROUP' as const,
     };
@@ -171,14 +176,39 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
           <Field label="1인당 최소 구매 수량 (선택)" hint="비워두면 1개부터 참여할 수 있어요" error={errors.minQty}>
             <Input value={minQty} onChangeText={setMinQty} keyboardType="number-pad" placeholder="1" />
           </Field>
-          <Field label="수령 장소">
-            <Input value={location} onChangeText={setLocation} placeholder="예) 레지던스홀 1층 로비" />
+          <Field label="수령 장소" hint="목록에는 건물 이름만 보이고, 상세 위치는 게시글 안에서 보여요">
+            <View style={styles.placeRow}>
+              <Pressable style={styles.buildingBtn} onPress={() => setBuildingSheet(true)}>
+                <Text style={[styles.buildingText, !building && { color: '#9aa5a1' }]} numberOfLines={1}>{building || '건물 선택'}</Text>
+                <Icon name="down" size={16} color={colors.textMuted} />
+              </Pressable>
+              <Input value={placeDetail} onChangeText={setPlaceDetail} placeholder="상세 위치 (예: 1층 로비)" style={{ flex: 1 }} />
+            </View>
           </Field>
           <Field label="상품 링크 (선택)">
             <Input value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" />
           </Field>
         </FormScroll>
       )}
+
+      <BottomSheet visible={buildingSheet} onClose={() => setBuildingSheet(false)}>
+        <Text style={styles.sheetTitle}>건물 선택</Text>
+        <ScrollView style={{ maxHeight: 380 }}>
+          {CAMPUS_BUILDINGS.map((b) => (
+            <Pressable
+              key={b}
+              style={styles.buildingItem}
+              onPress={() => {
+                setBuilding(b);
+                setBuildingSheet(false);
+              }}
+            >
+              <Text style={[styles.buildingItemText, b === building && { color: colors.primaryDark, fontWeight: '800' }]}>{b}</Text>
+              {b === building ? <Icon name="check" size={18} color={colors.primaryDark} /> : <Icon name="chevron" size={16} color={colors.textFaint} />}
+            </Pressable>
+          ))}
+        </ScrollView>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -187,6 +217,12 @@ const styles = StyleSheet.create({
   addPhoto: { width: 74, height: 74, borderRadius: 12, borderWidth: 1, borderColor: '#dfe6e3', alignItems: 'center', justifyContent: 'center', gap: 3 },
   addPhotoText: { fontSize: font.xs, color: colors.textMuted },
   removePhoto: { position: 'absolute', top: -5, right: -5, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(22,29,27,0.8)', alignItems: 'center', justifyContent: 'center' },
+  placeRow: { flexDirection: 'row', gap: 8 },
+  buildingBtn: { flex: 1, minHeight: 47, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, borderRadius: 11, borderWidth: 1, borderColor: '#dfe6e3', backgroundColor: 'white' },
+  buildingText: { flexShrink: 1, fontSize: font.base, color: colors.text },
+  sheetTitle: { marginBottom: 8, fontSize: 20, fontWeight: '800', color: colors.text },
+  buildingItem: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  buildingItemText: { fontSize: font.base, color: colors.text },
   preview: { marginTop: 2, marginBottom: 4, padding: 13, borderRadius: 12, backgroundColor: colors.primarySoft2 },
   previewText: { color: colors.primaryDeep, fontSize: font.base },
 });

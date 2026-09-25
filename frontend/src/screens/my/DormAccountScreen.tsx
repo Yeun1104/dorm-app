@@ -59,7 +59,7 @@ export default function DormAccountScreen({ navigation }: ScreenProps<'DormAccou
             </View>
             <Text style={styles.title}>{data?.linked ? '기숙사 계정이 연동되어 있어요' : '기숙사 계정이 연동되지 않았어요'}</Text>
             <Text style={styles.sub}>
-              {data?.linked ? '생활관 사이트의 기능을 숭팔이에서 바로 이용할 수 있어요.' : data && 'message' in data ? data.message : ''}
+              {data?.linked ? '생활관 사이트의 기능을 나누다에서 바로 이용할 수 있어요.' : data && 'message' in data ? data.message : ''}
             </Text>
           </View>
 

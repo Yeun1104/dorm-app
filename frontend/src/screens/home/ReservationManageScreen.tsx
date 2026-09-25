@@ -6,6 +6,7 @@ import { reservationApi } from '../../api/trade';
 import type { Board, Reservation, ReservationStatus } from '../../api/types';
 import { userApi } from '../../api/user';
 import { useConfirm, useToast } from '../../components/Feedback';
+import Icon from '../../components/Icon';
 import { Avatar, Chip, ChipTone, CountBadge, EmptyState, ErrorView, LoadingView, PageHeader, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
 import { RESERVATION_STATUS_LABEL } from '../../constants';
 import { invalidateBoard } from '../../hooks/useBoards';
@@ -109,17 +110,42 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
 
   const board = detail.data?.board;
 
-  const renderBoardPicker = () =>
-    route.params?.boardId == null && (myBoards.data?.length ?? 0) > 1 ? (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picker}>
-        {myBoards.data!.map((b) => (
-          <Pressable key={b.id} style={[styles.pickerItem, b.id === selectedId && styles.pickerItemActive]} onPress={() => setSelectedId(b.id)}>
-            <Text style={[styles.pickerText, b.id === selectedId && { color: 'white' }]} numberOfLines={1}>{b.title}</Text>
-            <CountBadge count={b.waitingCount} style={{ top: -6, right: -6 }} />
+  const openBoard = () => board && navigation.navigate('BoardDetail', { boardId: board.id });
+  const openMyPosts = () => navigation.navigate('MyPosts');
+
+  // 내 글이 여러 개면 가로로 넘기는 카드에서 고르고, 하나면 그 글 카드만 보여줌
+  const renderBoardSection = () => (
+    <View style={{ marginBottom: 4 }}>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>내 공동구매</Text>
+        {board && (
+          <Pressable style={styles.sectionLink} onPress={openMyPosts} hitSlop={8}>
+            <Text style={styles.sectionLinkText}>게시글 보기</Text>
+            <Icon name="chevron" size={13} color={colors.textMuted} />
           </Pressable>
-        ))}
-      </ScrollView>
-    ) : null;
+        )}
+      </View>
+      {route.params?.boardId == null && (myBoards.data?.length ?? 0) > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picker} style={{ marginHorizontal: -18 }}>
+          {myBoards.data!.map((b) => {
+            const active = b.id === selectedId;
+            return (
+              <Pressable key={b.id} style={[styles.pickCard, active && styles.pickCardActive]} onPress={() => setSelectedId(b.id)}>
+                <Thumb uri={b.images[0]?.imageUrl} size={46} radius={10} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.pickTitle} numberOfLines={1}>{b.title}</Text>
+                  <Text style={styles.pickMeta} numberOfLines={1}>{b.remainingQuantity}개 남음 · {won(b.unitPrice)}</Text>
+                </View>
+                <CountBadge count={b.waitingCount} style={{ top: -6, right: -6 }} />
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : (
+        board && <BoardHeader board={board} onPress={openBoard} />
+      )}
+    </View>
+  );
 
   let body: ReactNode;
   if (route.params?.boardId == null && myBoards.loading) body = <LoadingView />;
@@ -134,12 +160,7 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
         keyExtractor={(r) => String(r.id)}
         contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={detail.refreshing} onRefresh={detail.refresh} tintColor={colors.primary} />}
-        ListHeaderComponent={
-          <>
-            {board && <BoardHeader board={board} onPress={() => navigation.navigate('BoardDetail', { boardId: board.id })} />}
-            <SafeNote />
-          </>
-        }
+        ListHeaderComponent={renderBoardSection()}
         ListEmptyComponent={<EmptyState title={`${{ PENDING: '대기중', ACCEPTED: '수락된', REJECTED: '거절된' }[tab]} 요청이 없어요`} message="새로운 요청이 오면 여기에 표시돼요." />}
         renderItem={({ item }) => (
           <RequestCard
@@ -160,7 +181,6 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
       ) : (
         <SubHeader title="참여 요청 관리" subtitle="내 게시글에 도착한 참여 요청이에요" />
       )}
-      {renderBoardPicker()}
       <SegmentedTabs
         tabs={[
           { value: 'PENDING', label: '대기중' },
@@ -179,22 +199,13 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
 function BoardHeader({ board, onPress }: { board: Board; onPress: () => void }) {
   return (
     <Pressable style={styles.board} onPress={onPress}>
-      <Thumb uri={board.images[0]?.imageUrl} size={54} radius={11} />
-      <View style={{ flex: 1, justifyContent: 'center' }}>
-        <Text style={styles.boardEyebrow}>진행 중인 공동구매</Text>
-        <Text style={styles.boardTitle} numberOfLines={1}>{board.title}</Text>
-        <Text style={styles.boardEyebrow}>{board.remainingQuantity}개 남음 · 개당 {won(board.unitPrice)}</Text>
+      <Thumb uri={board.images[0]?.imageUrl} size={60} radius={12} />
+      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+        <Text style={styles.boardTitle} numberOfLines={2}>{board.title}</Text>
+        <Text style={styles.boardMeta}>{board.remainingQuantity}개 남음 · 개당 {won(board.unitPrice)}</Text>
       </View>
+      <Icon name="chevron" size={17} color={colors.textFaint} />
     </Pressable>
-  );
-}
-
-function SafeNote() {
-  return (
-    <View style={styles.safeNote}>
-      <Text style={styles.safeTitle}>안심하고 거래하세요</Text>
-      <Text style={styles.safeText}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
-    </View>
   );
 }
 
@@ -246,16 +257,18 @@ function RequestCard({ r, onProfile, onAccept, onReject, onChat }: { r: Reservat
 }
 
 const styles = StyleSheet.create({
-  picker: { paddingHorizontal: 18, paddingVertical: 12, gap: 8, backgroundColor: 'white' },
-  pickerItem: { maxWidth: 180, height: 34, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1, borderColor: '#e0e6e3', justifyContent: 'center' },
-  pickerItemActive: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight },
-  pickerText: { fontSize: font.sm, color: '#77827e', fontWeight: '600' },
-  board: { flexDirection: 'row', gap: 11, padding: 10, borderRadius: 15, backgroundColor: colors.primarySoft2 },
-  boardEyebrow: { color: '#6e837a', fontSize: font.xs },
-  boardTitle: { marginVertical: 2, fontSize: font.md, fontWeight: '700', color: colors.text },
-  safeNote: { marginTop: 12, padding: 15, borderRadius: 14, backgroundColor: '#fff9e9' },
-  safeTitle: { fontSize: font.sm, fontWeight: '700', color: '#9b751d' },
-  safeText: { marginTop: 3, color: '#95865f', fontSize: font.xs },
+  sectionHead: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: font.base, fontWeight: '800', color: colors.text },
+  sectionLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  sectionLinkText: { fontSize: font.xs, color: colors.textMuted },
+  picker: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 4, gap: 10 },
+  pickCard: { width: 210, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 15, borderWidth: 1.5, borderColor: '#e6ebe9', backgroundColor: 'white' },
+  pickCardActive: { borderColor: colors.primaryLight, backgroundColor: colors.primaryTint },
+  pickTitle: { fontSize: font.sm, fontWeight: '700', color: colors.text },
+  pickMeta: { marginTop: 3, fontSize: font.xs, color: colors.textMuted },
+  board: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6ebe9', backgroundColor: 'white' },
+  boardTitle: { fontSize: font.md, fontWeight: '700', color: colors.text, lineHeight: 20 },
+  boardMeta: { marginTop: 4, color: colors.textMuted, fontSize: font.xs },
   card: { marginTop: 12, padding: 16, borderWidth: 1, borderColor: '#e6ebe9', borderRadius: 18, backgroundColor: 'white' },
   person: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   name: { fontSize: font.base, fontWeight: '700', color: colors.text },

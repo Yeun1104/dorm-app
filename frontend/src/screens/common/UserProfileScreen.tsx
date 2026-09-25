@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { errorMessage } from '../../api/client';
 import { profileApi } from '../../api/trade';
 import type { BoardSummary, Profile } from '../../api/types';
-import { useMe } from '../../auth/AuthContext';
+import { userApi } from '../../api/user';
+import { useAuth, useMe } from '../../auth/AuthContext';
 import { BoardStatusChip } from '../../components/BoardCard';
+import { useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { Avatar, ErrorView, LoadingView, Screen, SegmentedTabs, SubHeader } from '../../components/ui';
+import { Avatar, BottomSheet, Button, ErrorView, Field, Input, LoadingView, Screen, SegmentedTabs, SubHeader } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
@@ -14,8 +17,34 @@ import { formatDate, won } from '../../utils/format';
 export default function UserProfileScreen({ navigation, route }: ScreenProps<'UserProfile'>) {
   const { userId } = route.params;
   const me = useMe();
+  const { refreshMe } = useAuth();
+  const toast = useToast();
   const { data, error, loading, reload } = useFetch(() => profileApi.get(userId), [userId]);
   const isMe = userId === me.userId;
+  const [nicknameSheet, setNicknameSheet] = useState(false);
+  const [nickname, setNickname] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const openNickname = () => {
+    setNickname(me.nickname ?? '');
+    setNicknameSheet(true);
+  };
+
+  const saveNickname = async () => {
+    if (!nickname.trim()) return;
+    setSaving(true);
+    try {
+      await userApi.updateNickname(nickname.trim());
+      await refreshMe();
+      reload();
+      setNicknameSheet(false);
+      toast('닉네임을 변경했어요');
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Screen bg={colors.bgSub}>
@@ -34,8 +63,16 @@ export default function UserProfileScreen({ navigation, route }: ScreenProps<'Us
       ) : error || !data ? (
         <ErrorView message={error ?? '프로필을 불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ProfileBody profile={data} onBoard={(id) => navigation.navigate('BoardDetail', { boardId: id })} />
+        <ProfileBody profile={data} onBoard={(id) => navigation.navigate('BoardDetail', { boardId: id })} onEditNickname={isMe ? openNickname : undefined} />
       )}
+
+      <BottomSheet visible={nicknameSheet} onClose={() => setNicknameSheet(false)}>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>닉네임 변경</Text>
+        <Field label="새 닉네임">
+          <Input value={nickname} onChangeText={setNickname} maxLength={20} autoFocus />
+        </Field>
+        <Button label="저장" onPress={saveNickname} loading={saving} style={{ marginTop: 8 }} />
+      </BottomSheet>
     </Screen>
   );
 }
@@ -57,7 +94,7 @@ export function MannerBadges({ profile, compact }: { profile: Profile; compact?:
   );
 }
 
-function ProfileBody({ profile, onBoard }: { profile: Profile; onBoard: (id: number) => void }) {
+function ProfileBody({ profile, onBoard, onEditNickname }: { profile: Profile; onBoard: (id: number) => void; onEditNickname?: () => void }) {
   const [tab, setTab] = useState<'progress' | 'done'>('progress');
   const list = tab === 'progress' ? profile.inProgressBoards : profile.completedBoards;
 
@@ -65,7 +102,16 @@ function ProfileBody({ profile, onBoard }: { profile: Profile; onBoard: (id: num
     <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
       <View style={styles.hero}>
         <Avatar name={profile.nickname} size={62} />
-        <Text style={styles.name}>{profile.nickname}</Text>
+        {onEditNickname ? (
+          <Pressable style={styles.nameRow} onPress={onEditNickname} hitSlop={6} accessibilityLabel="닉네임 변경">
+            <Text style={[styles.name, { marginTop: 0 }]}>{profile.nickname}</Text>
+            <View style={styles.editBtn}>
+              <Icon name="edit" size={13} color={colors.textBody} />
+            </View>
+          </Pressable>
+        ) : (
+          <Text style={styles.name}>{profile.nickname}</Text>
+        )}
         <Text style={styles.sub}>거래 {profile.tradeCount}회</Text>
       </View>
 
@@ -112,6 +158,8 @@ const styles = StyleSheet.create({
   report: { color: '#d55e63', fontSize: font.sm, fontWeight: '600' },
   hero: { paddingTop: 16, paddingBottom: 18, alignItems: 'center' },
   name: { marginTop: 10, fontSize: 18, fontWeight: '800', color: colors.text },
+  nameRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  editBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#eef1f0', alignItems: 'center', justifyContent: 'center' },
   sub: { marginTop: 3, color: '#829097', fontSize: font.sm },
   section: { marginTop: 12, padding: 15, borderWidth: 1, borderColor: '#e1e8ea', borderRadius: 15, backgroundColor: 'white' },
   sectionTitle: { marginBottom: 11, fontSize: font.md, fontWeight: '700', color: colors.text },

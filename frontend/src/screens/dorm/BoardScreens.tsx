@@ -11,9 +11,9 @@ import {
   CheckRow,
   EmptyState,
   ErrorView,
+  Fab,
   Field,
   FormScroll,
-  HeaderAddButton,
   Input,
   LoadingView,
   RadioRow,
@@ -22,7 +22,7 @@ import {
 } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
-import { colors, font, shadow } from '../../theme';
+import { colors, font } from '../../theme';
 import { BoardRow, DetailHeader, detailStyles, PAGE_SIZE, Pager } from './dormShared';
 
 type Kind = 'repair' | 'notice' | 'inquiry';
@@ -100,12 +100,7 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
           }
         />
       )}
-      {onWrite && (
-        <Pressable style={styles.fab} onPress={onWrite}>
-          <Icon name="plus" color="white" />
-          <Text style={styles.fabText}>글쓰기</Text>
-        </Pressable>
-      )}
+      {onWrite && <Fab label="글쓰기" onPress={onWrite} />}
     </>
   );
 }
@@ -131,12 +126,8 @@ export function NoticeListScreen({ navigation }: ScreenProps<'NoticeList'>) {
 export function InquiryListScreen({ navigation }: ScreenProps<'InquiryList'>) {
   return (
     <Screen bg={colors.bgSub}>
-      <SubHeader
-        title={META.inquiry.title}
-        subtitle={META.inquiry.subtitle}
-        action={<HeaderAddButton label="문의하기" onPress={() => navigation.navigate('InquiryForm', {})} />}
-      />
-      <DormBoardList kind="inquiry" onOpen={(no) => navigation.navigate('InquiryDetail', { no })} />
+      <SubHeader title={META.inquiry.title} subtitle={META.inquiry.subtitle} />
+      <DormBoardList kind="inquiry" onOpen={(no) => navigation.navigate('InquiryDetail', { no })} onWrite={() => navigation.navigate('InquiryForm', {})} />
     </Screen>
   );
 }
@@ -277,7 +268,9 @@ export function InquiryDetailScreen({ navigation, route }: ScreenProps<'InquiryD
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : data.detail.locked ? (
-        <EmptyState icon="lock" title="🔒 비밀글입니다" message="작성자와 관리자만 볼 수 있어요." />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <EmptyState icon="lock" title="🔒 비밀글입니다" message="작성자와 관리자만 볼 수 있어요." />
+        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.detail.title} meta={[data.detail.writer, `조회 ${data.detail.viewCount}`, data.detail.writtenAt]} />
@@ -437,8 +430,6 @@ function WriterInfo({ name, email }: { name: string; email: string }) {
 
 const styles = StyleSheet.create({
   reply: { color: colors.primaryDark, fontWeight: '700' },
-  fab: { position: 'absolute', right: 20, bottom: 24, height: 48, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 24, backgroundColor: colors.primary, ...shadow.fab },
-  fabText: { color: 'white', fontSize: font.md, fontWeight: '700' },
   visit: { marginTop: 14, padding: 12, flexDirection: 'row', justifyContent: 'space-between', borderRadius: 11, backgroundColor: '#f5f7f6' },
   visitLabel: { fontSize: font.sm, color: '#78837f' },
   visitValue: { fontSize: font.sm, fontWeight: '700', color: colors.text },

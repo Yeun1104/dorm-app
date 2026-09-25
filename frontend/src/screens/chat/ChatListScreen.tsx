@@ -97,6 +97,28 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
           </Pressable>
         }
       />
+      {editing && (
+        <View style={styles.editBar}>
+          <Text style={styles.editCount}>{selected.length}개 선택</Text>
+          <View style={styles.editActions}>
+            <Pressable style={[styles.subBtn, !selected.length && { opacity: 0.4 }]} disabled={!selected.length} onPress={() => setSelected([])}>
+              <Text style={styles.subBtnText}>다시 선택</Text>
+            </Pressable>
+            <Pressable
+              style={styles.subBtn}
+              onPress={() => {
+                setEditing(false);
+                setSelected([]);
+              }}
+            >
+              <Text style={styles.subBtnText}>취소</Text>
+            </Pressable>
+            <Pressable style={[styles.deleteBtn, !selected.length && { backgroundColor: '#d5dcde' }]} disabled={!selected.length} onPress={leaveSelected}>
+              <Text style={styles.deleteText}>삭제</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
       {rooms.loading && !rooms.data ? (
         <LoadingView />
       ) : rooms.error && !rooms.data ? (
@@ -106,7 +128,7 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
           data={rooms.data ?? []}
           keyExtractor={(r) => String(r.id)}
           renderItem={renderRoom}
-          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: editing ? 90 : 30 }}
+          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 30 }}
           refreshControl={
             <RefreshControl
               refreshing={rooms.refreshing}
@@ -137,15 +159,6 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
           ListEmptyComponent={<EmptyState icon="chat" title="아직 열린 채팅방이 없어요" message="방장이 참여 요청을 수락하면 채팅방이 열려요." />}
         />
       )}
-
-      {editing && (
-        <View style={styles.editBar}>
-          <Text style={styles.editCount}>{selected.length}개 선택</Text>
-          <Pressable style={[styles.deleteBtn, !selected.length && { backgroundColor: '#d5dcde' }]} disabled={!selected.length} onPress={leaveSelected}>
-            <Text style={styles.deleteText}>삭제</Text>
-          </Pressable>
-        </View>
-      )}
     </Screen>
   );
 }
@@ -170,8 +183,11 @@ const styles = StyleSheet.create({
   unread: { minWidth: 19, height: 19, paddingHorizontal: 5, marginTop: 18, borderRadius: 10, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   unreadText: { color: 'white', fontSize: 10, fontWeight: '700' },
   product: { color: colors.primaryDark, fontSize: font.xs },
-  editBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 62, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#e0e7e9', backgroundColor: 'white' },
+  editBar: { paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   editCount: { fontSize: font.md, color: '#6d7b81' },
-  deleteBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 11, backgroundColor: colors.danger },
+  editActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  subBtn: { height: 36, paddingHorizontal: 15, borderRadius: 18, justifyContent: 'center', backgroundColor: '#eef1f0' },
+  subBtnText: { color: '#68736f', fontSize: font.md, fontWeight: '600' },
+  deleteBtn: { height: 36, paddingHorizontal: 17, borderRadius: 18, justifyContent: 'center', backgroundColor: colors.danger },
   deleteText: { color: 'white', fontSize: font.md, fontWeight: '700' },
 });

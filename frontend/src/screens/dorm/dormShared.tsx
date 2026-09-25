@@ -33,7 +33,7 @@ export function BoardRow({
 }) {
   return (
     <Pressable style={styles.row} onPress={onPress}>
-      <Text style={styles.no}>{no}</Text>
+      <Text style={styles.no} numberOfLines={1}>{no}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           {leading}
@@ -86,7 +86,7 @@ export const detailStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   row: { minHeight: 70, paddingVertical: 13, flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e1e8ea' },
-  no: { width: 32, paddingTop: 1, textAlign: 'center', color: colors.textFaint, fontSize: font.xs },
+  no: { minWidth: 48, paddingTop: 1, textAlign: 'center', color: colors.textFaint, fontSize: font.xs },
   title: { flexShrink: 1, fontSize: font.base, fontWeight: '600', color: colors.text },
   meta: { marginTop: 5, color: '#909ca1', fontSize: font.xs },
   date: { color: '#97a2a6', fontSize: font.xs, paddingTop: 1 },

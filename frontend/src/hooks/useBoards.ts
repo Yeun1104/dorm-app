@@ -23,6 +23,10 @@ export function invalidateBoard(id: number) {
   cache.delete(id);
 }
 
+export function clearBoardCache() {
+  cache.clear();
+}
+
 /** ids에 해당하는 게시글 맵. 삭제된 글 등 조회 실패한 건 null */
 export function useBoards(ids: number[]): Record<number, Board | null> {
   const [boards, setBoards] = useState<Record<number, Board | null>>({});

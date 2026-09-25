@@ -1,8 +1,10 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { profileApi, reservationApi } from '../../api/trade';
 import { useMe } from '../../auth/AuthContext';
 import Icon from '../../components/Icon';
+import { useToast } from '../../components/Feedback';
 import { Avatar, PageHeader, Screen } from '../../components/ui';
+import { SUPPORT_EMAIL } from '../../constants';
 import { useFetch } from '../../hooks/useFetch';
 import type { AppStackParamList, ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
@@ -20,7 +22,11 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
   const profile = useFetch(() => profileApi.get(me.userId), [me.userId], { refetchOnFocus: true });
   const reservations = useFetch(() => reservationApi.mine(), [], { refetchOnFocus: true });
 
+  const toast = useToast();
   const count = (s: string) => reservations.data?.filter((r) => r.status === s).length ?? 0;
+
+  const openInquiry = () =>
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[나누다] 문의')}`).catch(() => toast('메일 앱을 열 수 없어요'));
 
   return (
     <Screen>
@@ -45,15 +51,24 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
           />
         }
       >
-        <Pressable style={styles.profileCard} onPress={() => navigation.navigate('UserProfile', { userId: me.userId })}>
-          <Avatar name={me.nickname} size={62} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{me.nickname}</Text>
-            <Text style={styles.sub}>거래 {profile.data?.tradeCount ?? 0}회</Text>
-            {profile.data && <MannerBadges profile={profile.data} compact />}
-          </View>
-          <Icon name="chevron" size={18} color={colors.textFaint} />
-        </Pressable>
+        <View style={styles.profileCard}>
+          <Pressable style={styles.profileTop} onPress={() => navigation.navigate('UserProfile', { userId: me.userId })}>
+            <Avatar name={me.nickname} size={58} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.name} numberOfLines={1}>{me.nickname}</Text>
+              <Text style={styles.sub}>거래 {profile.data?.tradeCount ?? 0}회</Text>
+            </View>
+            <View style={styles.profileBtn}>
+              <Text style={styles.profileBtnText}>프로필 보기</Text>
+            </View>
+          </Pressable>
+          {profile.data && (
+            <View style={styles.manner}>
+              <Text style={styles.mannerLabel}>받은 매너 평가</Text>
+              <MannerBadges profile={profile.data} compact />
+            </View>
+          )}
+        </View>
 
         <View style={styles.activity}>
           {[
@@ -77,7 +92,12 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
           ))}
         </View>
 
-        <Text style={styles.version}>숭팔이 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
+        <Pressable style={[styles.menu, styles.menuItem, { marginTop: 12 }]} onPress={openInquiry}>
+          <Text style={styles.menuText}>문의하기</Text>
+          <Icon name="chevron" size={18} color={colors.textMuted} />
+        </Pressable>
+
+        <Text style={styles.version}>나누다 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
       </ScrollView>
     </Screen>
   );
@@ -85,9 +105,14 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
 
 const styles = StyleSheet.create({
   settings: { color: '#75807c', fontSize: font.md },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 20, borderWidth: 1, borderColor: colors.border, borderRadius: 21, backgroundColor: 'white' },
-  name: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 3 },
-  sub: { marginBottom: 9, color: '#6f7c77', fontSize: font.sm },
+  profileCard: { padding: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 22, backgroundColor: 'white' },
+  profileTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  name: { fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
+  sub: { marginTop: 3, color: colors.textMuted, fontSize: font.sm },
+  profileBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: '#f2f5f4' },
+  profileBtnText: { fontSize: font.xs, fontWeight: '700', color: colors.textBody },
+  manner: { marginTop: 16, paddingTop: 14, gap: 8, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  mannerLabel: { fontSize: font.xs, fontWeight: '700', color: colors.textMuted },
   activity: { marginVertical: 14, paddingVertical: 17, paddingHorizontal: 5, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white' },
   activityItem: { flex: 1, alignItems: 'center', gap: 3 },
   activityDivider: { borderRightWidth: 1, borderRightColor: '#e5eae8' },

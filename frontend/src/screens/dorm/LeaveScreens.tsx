@@ -6,7 +6,7 @@ import type { OutingListItem } from '../../api/types';
 import DateRangeCalendar from '../../components/DateRangeCalendar';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { Button, Chip, EmptyState, ErrorView, Field, FormScroll, HeaderAddButton, Input, LoadingView, Screen, SubHeader } from '../../components/ui';
+import { Button, Chip, EmptyState, ErrorView, Fab, Field, FormScroll, Input, LoadingView, Screen, SubHeader } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
@@ -66,7 +66,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
 
   return (
     <Screen bg={colors.bgSub}>
-      <SubHeader title={t.title} subtitle={t.subtitle} action={<HeaderAddButton label="신청하기" onPress={() => navigation.navigate('LeaveForm', { kind })} />} />
+      <SubHeader title={t.title} subtitle={t.subtitle} />
       {loading && !data ? (
         <LoadingView />
       ) : error && !data ? (
@@ -76,7 +76,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
           data={data ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View style={styles.guide}>
@@ -93,6 +93,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
           ListFooterComponent={<Pager page={page} hasNext={(data?.length ?? 0) >= PAGE_SIZE} loading={loading} onChange={setPage} />}
         />
       )}
+      <Fab label="신청하기" onPress={() => navigation.navigate('LeaveForm', { kind })} />
     </Screen>
   );
 }

@@ -20,18 +20,20 @@ const CLOSED_PATTERN = /운영\s*(을|를)?\s*(하지|안\s*함|않)|미운영|�
 
 export const isClosedText = (items: string[] | undefined) => !!items?.some((t) => CLOSED_PATTERN.test(t));
 
+/** 칸에서 운영 안내 문구를 뺀 실제 메뉴만 */
+export const menuItems = (items: string[] | undefined) => (items ?? []).filter((t) => !CLOSED_PATTERN.test(t));
+
 /**
  * 하루 전체가 미운영인지.
- * 조식은 운영하지 않아서 식당이 연휴 안내 같은 공지를 조식 칸에 적는 경우가 많음 → 조식 칸에 운영 중단 문구가 있거나
- * 중식/석식/일품이 모두 비어 있으면 미운영으로 봄. notice는 화면에 같이 보여줄 원문 안내.
+ * 조식은 운영하지 않아서 식당이 조식 칸에 '조식 운영하지 않습니다' 같은 공지를 거의 매일 적어둠 → 조식 칸은 판단에 쓰지 않고,
+ * 중식/석식/일품 중 실제 메뉴가 하나도 없을 때만 미운영으로 봄. notice는 화면에 같이 보여줄 원문 안내.
  */
 export function dayClosure(day: FoodMenuDay | undefined): { closed: boolean; notice: string | null } {
   if (!day) return { closed: false, notice: null };
-  const noticeSource = [day.breakfast, day.lunch, day.dinner, day.combinedMeal].find(isClosedText);
-  const notice = noticeSource ? noticeSource.join(' ') : null;
-  if (isClosedText(day.breakfast)) return { closed: true, notice };
-  const empty = !day.lunch?.length && !day.dinner?.length && !day.combinedMeal?.length;
-  return { closed: empty, notice: empty ? notice : null };
+  const served = [day.lunch, day.dinner, day.combinedMeal].some((m) => menuItems(m).length > 0);
+  if (served) return { closed: false, notice: null };
+  const noticeSource = [day.lunch, day.dinner, day.combinedMeal, day.breakfast].find(isClosedText);
+  return { closed: true, notice: noticeSource ? noticeSource.join(' ') : null };
 }
 
 export type MealPreview =
@@ -47,7 +49,8 @@ export function mealPreview(day: FoodMenuDay | undefined, now = new Date()): Mea
 
   const dinnerTime = now.getHours() >= DINNER_PREVIEW_FROM_HOUR;
   const label = dinnerTime ? '저녁' : '점심';
-  const items = dinnerTime ? day.dinner : day.lunch?.length ? day.lunch : day.combinedMeal;
-  if (!items?.length || isClosedText(items)) return { kind: 'closed', label, notice: isClosedText(items) ? items.join(' ') : null };
+  const raw = dinnerTime ? day.dinner : menuItems(day.lunch).length ? day.lunch : day.combinedMeal;
+  const items = menuItems(raw);
+  if (!items.length) return { kind: 'closed', label, notice: isClosedText(raw) ? raw.join(' ') : null };
   return { kind: 'menu', label, items };
 }
