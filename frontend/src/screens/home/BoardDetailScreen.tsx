@@ -19,9 +19,7 @@ import { timeAgo, won } from '../../utils/format';
 
 const SCREEN_W = Dimensions.get('window').width;
 
-/** 작성자 판별: authorId가 내려오면 그걸로, 아니면 닉네임(unique)으로 */
-export const isMyBoard = (board: Pick<Board, 'authorId' | 'authorNickname'>, me: { userId: number; nickname: string }) =>
-  board.authorId != null ? board.authorId === me.userId : board.authorNickname === me.nickname;
+export const isMyBoard = (board: Pick<Board, 'authorId'>, me: { userId: number }) => board.authorId === me.userId;
 
 /** 같은 글에 여러 번 요청했을 수 있으니(거절 후 재요청 등) 가장 최근 것 */
 const latestFor = (list: Reservation[], boardId: number) =>
@@ -123,9 +121,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
     }
   };
 
-  const openAuthorProfile = () => {
-    if (board.authorId != null) navigation.navigate('UserProfile', { userId: board.authorId });
-  };
+  const openAuthorProfile = () => navigation.navigate('UserProfile', { userId: board.authorId });
 
   // ───────── 하단 액션바 ─────────
   let bottom: ReactNode;
@@ -212,13 +208,13 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
         )}
 
         <View style={styles.body}>
-          <Pressable style={styles.authorRow} onPress={openAuthorProfile} disabled={board.authorId == null}>
+          <Pressable style={styles.authorRow} onPress={openAuthorProfile}>
             <Avatar name={board.authorNickname} />
             <View style={{ flex: 1 }}>
               <Text style={styles.authorName}>{board.authorNickname}{mine ? ' (나)' : ''}</Text>
               <Text style={styles.authorSub}>좋아요 {board.likeCount}</Text>
             </View>
-            {board.authorId != null && <Icon name="chevron" size={18} color={colors.textFaint} />}
+            <Icon name="chevron" size={18} color={colors.textFaint} />
           </Pressable>
 
           <View style={styles.titleWrap}>

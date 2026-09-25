@@ -27,12 +27,12 @@ export const authApi = {
   /** POST /api/auth/register — 카카오 첫 로그인 후 temp_token + 닉네임으로 가입 */
   register: async (tempToken: string, nickname: string) =>
     (
-      await api.post<{ accessToken: string }>(
+      await api.post<{ accessToken: string; refreshToken: string }>(
         '/api/auth/register',
         { nickname },
         { headers: { Authorization: `Bearer ${tempToken}` } },
       )
-    ).data.accessToken,
+    ).data,
 
   /** POST /api/dev/auth/token — ⚠️ 로컬 개발 전용 (app.feature.dev-tools.enabled=true 일 때만 존재) */
   devToken: (kakaoId: string, nickname: string) =>

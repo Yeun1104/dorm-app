@@ -41,6 +41,9 @@ export const chatApi = {
   /** GET /api/chat/messages?roomId=&page= — 최신순(내림차순) 15개씩 */
   messages: (roomId: number, page = 0) =>
     get<ChatPage<ChatMessage>>('/api/chat/messages', { params: { roomId, page } }),
+  /** PATCH /api/chat/rooms/{roomId}/read?messageId= — 여기까지 읽음 처리 (안읽음 배지 초기화) */
+  markRead: (roomId: number, messageId: number) =>
+    patch<string>(`/api/chat/rooms/${roomId}/read`, null, { params: { messageId } }),
   /** DELETE /api/chat/rooms/{roomId}/leave — 채팅방 나가기(목록에서 삭제) */
   leave: (roomId: number) => del<ChatRoom>(`/api/chat/rooms/${roomId}/leave`),
 };

@@ -71,6 +71,22 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
 
   const { connected, send } = useChatSocket(roomId, (msg) => setMessages((prev) => [msg, ...prev]));
 
+  // 읽음 처리: 개별 메시지엔 id가 없어서 방의 lastMessageId 기준으로 처리.
+  // 들어올 때(+포커스 복귀 시 방 정보 재조회됨) 한 번, 나갈 때 그 사이 받은 메시지까지 한 번 더.
+  const lastMessageId = info.data?.room.lastMessageId;
+  useEffect(() => {
+    if (lastMessageId) chatApi.markRead(roomId, lastMessageId).catch(() => {});
+  }, [roomId, lastMessageId]);
+  useEffect(
+    () => () => {
+      chatApi
+        .room(roomId)
+        .then((r) => (r.lastMessageId ? chatApi.markRead(roomId, r.lastMessageId) : null))
+        .catch(() => {});
+    },
+    [roomId],
+  );
+
   const onSend = () => {
     const content = text.trim();
     if (!content) return;

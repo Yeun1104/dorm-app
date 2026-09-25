@@ -55,13 +55,19 @@ src/
 | 신고 | `POST /api/reports` |
 | 기숙사생활 | `/api/dorm/account(/verify)` · `/api/dorm/outing/**` · `/api/dorm/long-term-absence/**` · `/api/dorm/repair/**` · `/api/dorm/notice/**` · `/api/dorm/inquiry/**` · `/api/dorm/spoint` · `/api/dorm/ipsa/**` · `/api/dorm/food-menu` |
 
-## 알려진 백엔드 이슈 / 프론트 우회
+## 백엔드 브랜치
 
-- **일반문의 비밀글 플래그가 저장 안 됨** — `InquiryCreateReqDto`/`InquiryUpdateReqDto`의 `private boolean isSecret` + Lombok `@Getter`만으로는 Jackson이 JSON `isSecret`(또는 `secret`)을 바인딩하지 못해 항상 `false`. (Jackson 2.17로 재현 확인) 필드에 `@JsonProperty("isSecret")` 추가 필요. 프론트는 `isSecret` 키로 보냄.
-- **`BoardResDto`에 `authorId` 없음** — 작성자 판별은 닉네임(unique)으로 하고 있고, 게시글 상세에서 작성자 프로필로 이동이 불가. `authorId`를 추가하면 프론트는 코드 수정 없이 자동으로 켜짐(`Board.authorId?`).
-- **채팅 안읽음 수 / 메시지 ID 없음** — `ChatRoomResDto`에 unreadCount, `ChatMessageResDto`에 id가 없어서 목록의 빨간 뱃지와 `PATCH /api/chat/rooms/{id}/read` 읽음 처리를 못 붙임.
-- **STOMP 인증** — 서버에 `ChannelInterceptor`가 없어 발신자 식별이 WebSocket 핸드셰이크의 `Authorization` 헤더에 의존. 앱은 RN WebSocket 헤더로 토큰을 실어 보내지만, 실제 연결에서 senderId가 제대로 찍히는지 확인 필요. 안 되면 CONNECT 프레임 헤더를 읽는 인터셉터 추가 권장.
-- **리프레시 토큰** — 카카오 로그인 시 refreshToken 쿠키는 인앱 브라우저에 저장되어 앱 axios에는 없음 → 액세스 토큰 만료(1시간) 시 재로그인 필요. 모바일용으로 refreshToken을 응답 바디/리다이렉트 파라미터로 주는 방식 검토 필요.
-- **기숙사 계정 연동 해제 API 없음**, 연동 상태 조회 API 없음(→ `verify`로 대체, 세션당 1회).
-- 기숙사 게시판의 "본인 글" 판별은 상세 `writer` == 폼 기본값 `writerName` 비교. 사이트가 이름을 마스킹해서 내려주면 수정/삭제 버튼이 안 보일 수 있음.
+이 앱은 `feat/backend-group-buy-revamp` 브랜치(8a23aa7 이후)의 API 기준. `develop`의 backend에는 기숙사/참여요청/매너/신고/개발용 로그인 API가 없어서 앱이 동작하지 않음.
+
+## 백엔드 연동 메모
+
+- **토큰**: 카카오 리다이렉트의 `access_token`/`refresh_token`, 회원가입 응답의 `accessToken`/`refreshToken`을 SecureStore에 저장. 만료 시 `POST /api/auth/refresh`에 `{ refreshToken }` body로 재발급. (개발용 로그인은 refreshToken을 안 주므로 1시간 후 재로그인)
+- **채팅 인증**: STOMP CONNECT 헤더 `Authorization: Bearer …` (StompAuthInterceptor). 재연결 때마다 최신 토큰을 다시 읽음.
+- **읽음 처리**: 메시지 응답에 id가 없어 방의 `lastMessageId`로 `PATCH /api/chat/rooms/{id}/read` 호출 (입장 시 + 퇴장 시).
+
+## 남은 백엔드 이슈
+
+- **일반문의 비밀글 플래그가 저장 안 됨** — `InquiryCreateReqDto`/`InquiryUpdateReqDto`의 `private boolean isSecret` + Lombok `@Getter`만으로는 Jackson이 JSON `isSecret`을 바인딩하지 못해 항상 `false` (Jackson 2.17로 재현 확인). 필드에 `@JsonProperty("isSecret")` 추가 필요. 프론트는 `isSecret` 키로 보냄.
+- **기숙사 계정 연동 해제 / 연동 상태 조회 API 없음** — 상태는 `verify`로 대체(세션당 1회).
+- 기숙사 게시판의 "본인 글" 판별은 상세 `writer` == 폼 기본값 `writerName` 비교. 사이트가 이름을 마스킹하면 수정/삭제 버튼이 안 보일 수 있음.
 - `ReportCreateReqDto.reason`이 `@NotBlank`라 신고 사유 입력은 필수로 처리.

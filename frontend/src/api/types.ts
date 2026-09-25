@@ -36,9 +36,8 @@ export interface Board {
   location: string | null;
   category: BoardCategory;
   status: BoardStatus;
+  authorId: number;
   authorNickname: string;
-  /** ⚠️ 현재 BoardResDto에 없음. 백엔드에 추가되면 작성자 프로필 이동이 자동으로 켜짐 */
-  authorId?: number;
   createdAt: string;
   images: BoardImage[];
   likeCount: number;
@@ -104,7 +103,11 @@ export interface ChatRoom {
   userCount: number;
   users: ChatRoomUser[];
   lastMessage: string | null;
+  /** 읽음 처리(PATCH /read?messageId=)에 사용 */
+  lastMessageId: number | null;
   lastMessageTime: string | null;
+  /** 내가 안 읽은(상대가 보낸) 메시지 수 */
+  unreadCount: number | null;
 }
 
 export interface ChatMessage {

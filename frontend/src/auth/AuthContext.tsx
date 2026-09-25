@@ -56,8 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithToken = useCallback(
-    async (accessToken: string) => {
+    async (accessToken: string, refreshToken?: string | null) => {
       await tokenStorage.set(accessToken);
+      await tokenStorage.setRefresh(refreshToken);
       await loadMe();
     },
     [loadMe],
@@ -94,9 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { queryParams } = Linking.parse(result.url);
     const accessToken = queryParams?.access_token;
+    const refreshToken = queryParams?.refresh_token;
     const tempToken = queryParams?.temp_token;
     if (typeof accessToken === 'string') {
-      await signInWithToken(accessToken);
+      await signInWithToken(accessToken, typeof refreshToken === 'string' ? refreshToken : null);
       return { type: 'signedIn' };
     }
     if (typeof tempToken === 'string') return { type: 'needSignup', tempToken };
@@ -105,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const completeSignup = useCallback(
     async (tempToken: string, nickname: string) => {
-      const accessToken = await authApi.register(tempToken, nickname);
-      await signInWithToken(accessToken);
+      const { accessToken, refreshToken } = await authApi.register(tempToken, nickname);
+      await signInWithToken(accessToken, refreshToken);
     },
     [signInWithToken],
   );
