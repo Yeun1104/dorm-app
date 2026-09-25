@@ -55,8 +55,9 @@ public class BoardResDto {
                 .status(board.getStatus())
                 .likeCount(likeCount)
                 .liked(liked)
-                .authorId(board.getUser().getId())
-                .authorNickname(board.getUser().getNickName())
+                // User가 null인지 확인하는 방어 로직
+                .authorId(board.getUser() != null ? board.getUser().getId() : null)
+                .authorNickname(board.getUser() != null ? board.getUser().getNickName() : "알 수 없음")
                 .createdAt(board.getCreatedAt())
                 .images(board.getBoardImages().stream()
                         .map(BoardImageDto::new)
