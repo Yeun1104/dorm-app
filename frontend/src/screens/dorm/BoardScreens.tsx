@@ -77,6 +77,10 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
 
   return (
     <>
+      {/* 검색창은 목록 밖(위)에 둬야 필드 선택 드롭다운이 글 목록 위에 제대로 덮임 */}
+      <View style={styles.searchWrap}>
+        <BoardSearchBar field={field} onFieldChange={setField} keyword={keyword} onKeywordChange={setKeyword} onSubmit={search} />
+      </View>
       {loading && !data ? (
         <LoadingView />
       ) : error && !data ? (
@@ -86,14 +90,9 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
           data={data ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-          ListHeaderComponent={
-            <View style={{ marginBottom: 6, zIndex: 10 }}>
-              <BoardSearchBar field={field} onFieldChange={setField} keyword={keyword} onKeywordChange={setKeyword} onSubmit={search} />
-            </View>
-          }
           ListEmptyComponent={<EmptyState icon="doc" title={query.keyword ? '검색 결과가 없어요' : META[kind].empty} />}
           ListFooterComponent={
             <Pager page={query.page} hasNext={(data?.length ?? 0) >= PAGE_SIZE} loading={loading} onChange={(page) => setQuery((q) => ({ ...q, page }))} />
@@ -440,6 +439,7 @@ function WriterInfo({ name, email }: { name: string; email: string }) {
 }
 
 const styles = StyleSheet.create({
+  searchWrap: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 6, zIndex: 10, elevation: 10 },
   reply: { marginBottom: 6, padding: 16, borderRadius: 16, backgroundColor: '#f3f6f5' },
   replyHead: { marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 7 },
   replyIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center' },
