@@ -1,4 +1,4 @@
-# 숭팔이 앱 (React Native / Expo)
+# 나눠도 앱 (React Native / Expo)
 
 숭실대 기숙사생 공동구매 + 기숙사생활 앱. Expo SDK 57 · React Navigation 7 · axios · STOMP.
 

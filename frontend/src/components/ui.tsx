@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DormSearchField } from '../api/types';
-import { colors, font, radius } from '../theme';
+import { colors, font, radius, shadow } from '../theme';
 import Icon, { IconName } from './Icon';
 
 // ───────── 화면 컨테이너 ─────────
@@ -68,6 +68,15 @@ export function HeaderAddButton({ label, onPress, icon = 'plus' }: { label: stri
     <Pressable style={s.headerAdd} onPress={onPress}>
       <Icon name={icon} size={15} color="white" />
       <Text style={s.headerAddText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** 화면 오른쪽 아래에 떠 있는 동그란 + 버튼 (label은 스크린리더용) */
+export function Fab({ label, onPress, icon = 'plus' }: { label: string; onPress: () => void; icon?: IconName }) {
+  return (
+    <Pressable style={s.fab} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      <Icon name={icon} size={26} color="white" strokeWidth={2.4} />
     </Pressable>
   );
 }
@@ -183,7 +192,7 @@ export function Thumb({ uri, size, radius: r = 12, style }: { uri?: string | nul
 
 // ───────── 진행률 게이지 ─────────
 
-export function ProgressBar({ ratio, height = 6 }: { ratio: number; height?: number }) {
+export function ProgressBar({ ratio, height = 10 }: { ratio: number; height?: number }) {
   const pct = Math.max(0, Math.min(1, ratio)) * 100;
   return (
     <View style={[s.progressTrack, { height }]}>
@@ -194,7 +203,7 @@ export function ProgressBar({ ratio, height = 6 }: { ratio: number; height?: num
 
 // ───────── 탭/필터 ─────────
 
-/** 밑줄형 탭 (.segmented-tabs) */
+/** 글씨형 탭 — 배경 없이 선택된 탭만 검정 굵은 글씨, 나머지는 회색 */
 export function SegmentedTabs<T extends string>({ tabs, value, onChange, badges }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void; badges?: Partial<Record<T, number>> }) {
   return (
     <View style={s.segmented}>
@@ -437,11 +446,11 @@ export const s = StyleSheet.create({
   progressTrack: { overflow: 'hidden', borderRadius: 10, backgroundColor: '#e8f1f3' },
   progressFill: { height: '100%', borderRadius: 10, backgroundColor: '#6bbccc' },
 
-  segmented: { height: 48, paddingHorizontal: 18, flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e8ecea', backgroundColor: 'white' },
-  segmentedBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  segmentedBtnActive: { borderBottomColor: colors.primary },
-  segmentedText: { fontSize: font.md, color: '#8d9692' },
-  segmentedTextActive: { color: colors.primaryDark, fontWeight: '700' },
+  segmented: { height: 48, paddingHorizontal: 18, flexDirection: 'row' },
+  segmentedBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  segmentedBtnActive: {},
+  segmentedText: { fontSize: font.base, fontWeight: '600', color: '#b0b8b5' },
+  segmentedTextActive: { color: colors.text, fontWeight: '800' },
 
   pillsWrap: { height: 52, justifyContent: 'center', backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   pill: { height: 32, paddingHorizontal: 14, borderRadius: 17, borderWidth: 1, borderColor: '#e0e6e3', backgroundColor: 'white', justifyContent: 'center' },
@@ -482,6 +491,7 @@ export const s = StyleSheet.create({
   sheetHandle: { width: 43, height: 4, borderRadius: 4, backgroundColor: '#d9dfdc', alignSelf: 'center', marginBottom: 22 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
+  fab: { position: 'absolute', right: 20, bottom: 24, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, ...shadow.fab },
   empty: { minHeight: 200, alignItems: 'center', justifyContent: 'center', padding: 20 },
   emptyTitle: { marginTop: 11, color: '#63706b', fontSize: font.base, fontWeight: '700', textAlign: 'center' },
   emptyMessage: { marginTop: 4, color: '#9ba39f', fontSize: font.sm, textAlign: 'center' },

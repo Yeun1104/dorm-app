@@ -72,27 +72,27 @@ function LinkedHome({ navigation }: { navigation: ScreenProps<'DormHome'>['navig
       <PageHeader
         title="기숙사생활"
         right={
-          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          residentInfo ? (
             <View style={styles.linkedBadge}>
-              <Text style={styles.linkedBadgeText}>계정 연동됨</Text>
+              <Text style={styles.linkedBadgeText} numberOfLines={1}>{residentInfo}</Text>
             </View>
-            {!!residentInfo && <Text style={styles.residentInfo} numberOfLines={1}>{residentInfo}</Text>}
-          </View>
+          ) : undefined
         }
       />
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 35 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
       >
         <Pressable style={styles.meal} onPress={() => navigation.navigate('FoodMenu')}>
           <View style={styles.mealHead}>
-            <Icon name="meal" size={16} color="white" />
+            <Icon name="meal" size={16} color={colors.primaryDeep} />
             <Text style={styles.mealLabel}>
               {preview.kind === 'none' ? '오늘의 식단' : `오늘의 ${preview.label === '오늘' ? '식단' : preview.label}`}
             </Text>
             <View style={{ flex: 1 }} />
             <Text style={styles.mealMore}>전체 식단</Text>
-            <Icon name="chevron" size={13} color="rgba(255,255,255,0.85)" />
+            <Icon name="chevron" size={13} color="#909995" />
           </View>
           {preview.kind === 'menu' ? (
             <Text style={styles.mealMenu} numberOfLines={3}>{preview.items.join(' · ')}</Text>
@@ -136,14 +136,11 @@ function LinkedHome({ navigation }: { navigation: ScreenProps<'DormHome'>['navig
         </View>
 
         <Pressable style={styles.score} onPress={() => (data?.spoint ? navigation.navigate('Spoint') : toast('상벌점을 불러오지 못했어요'))}>
-          <View style={{ minWidth: 95 }}>
-            <Text style={styles.scoreLabel}>{latestScore ? `${latestScore.year}년 상벌점` : '상벌점 조회'}</Text>
-            <Text style={styles.scoreValue}>{latestScore ? `${latestScore.total}점` : '-'}</Text>
-          </View>
-          <Text style={styles.scoreText}>상벌점 전체 내역을{'\n'}확인해보세요</Text>
-          <View style={{ position: 'absolute', right: 16 }}>
-            <Icon name="star" size={36} color={colors.yellowIcon} />
-          </View>
+          <Text style={styles.scoreLabel}>{latestScore ? `${latestScore.year} 상벌점` : '상벌점'}</Text>
+          <Text style={styles.scoreValue}>{latestScore ? `${latestScore.total}점` : '-'}</Text>
+          <View style={{ flex: 1 }} />
+          <Text style={styles.scoreText}>상벌점 조회</Text>
+          <Icon name="chevron" size={15} color="#9d8a50" />
         </Pressable>
       </ScrollView>
     </Screen>
@@ -182,16 +179,15 @@ function QuickRow({ icon, title, sub, onPress }: { icon: IconName; title: string
 }
 
 const styles = StyleSheet.create({
-  linkedBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 15, backgroundColor: '#e0f1f5' },
+  linkedBadge: { maxWidth: 190, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 15, backgroundColor: '#e0f1f5' },
   linkedBadgeText: { color: colors.primaryDark, fontSize: font.xs, fontWeight: '700' },
-  residentInfo: { maxWidth: 170, color: colors.textSub, fontSize: font.xs },
-  meal: { minHeight: 120, padding: 20, borderRadius: 22, backgroundColor: '#3f93b0' },
+  meal: { minHeight: 120, padding: 20, borderRadius: 22, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
   mealHead: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mealLabel: { color: 'white', fontSize: font.md, fontWeight: '800' },
-  mealMore: { color: 'rgba(255,255,255,0.85)', fontSize: font.xs },
-  mealMenu: { color: 'white', fontSize: 16, lineHeight: 24, fontWeight: '700' },
-  mealClosed: { color: 'white', fontSize: 16, fontWeight: '700' },
-  mealNotice: { marginTop: 6, color: 'rgba(255,255,255,0.8)', fontSize: font.xs, lineHeight: 17 },
+  mealLabel: { color: colors.primaryDeep, fontSize: font.md, fontWeight: '800' },
+  mealMore: { color: '#909995', fontSize: font.xs },
+  mealMenu: { color: colors.text, fontSize: 16, lineHeight: 24, fontWeight: '700' },
+  mealClosed: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  mealNotice: { marginTop: 6, color: colors.textSub, fontSize: font.xs, lineHeight: 17 },
   menuTitle: { marginTop: 24, marginBottom: 12, fontSize: 17, fontWeight: '800', color: colors.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   gridItem: { width: '48.5%', height: 124, padding: 14, borderWidth: 1, borderColor: '#e8edeb', borderRadius: 18, backgroundColor: 'white' },
@@ -208,8 +204,8 @@ const styles = StyleSheet.create({
   noticeRow: { paddingVertical: 9, flexDirection: 'row', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: '#f0f2f1' },
   noticeText: { flex: 1, fontSize: font.sm, color: colors.text },
   noticeDate: { color: '#9ba29f', fontSize: font.xs },
-  score: { marginTop: 13, padding: 16, flexDirection: 'row', alignItems: 'center', borderRadius: 17, backgroundColor: colors.yellowBg, overflow: 'hidden' },
-  scoreLabel: { color: '#8d7737', fontSize: font.xs },
+  score: { marginTop: 13, minHeight: 60, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, backgroundColor: colors.yellowBg },
+  scoreLabel: { color: '#8d7737', fontSize: font.md, fontWeight: '700' },
   scoreValue: { color: colors.yellowText, fontSize: 21, fontWeight: '800' },
-  scoreText: { color: '#9d8a50', fontSize: font.xs, lineHeight: 17 },
+  scoreText: { color: '#9d8a50', fontSize: font.sm, fontWeight: '600' },
 });

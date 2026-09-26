@@ -4,13 +4,14 @@ import { errorMessage } from '../../api/client';
 import { reservationApi } from '../../api/trade';
 import type { Reservation, ReservationStatus } from '../../api/types';
 import { useConfirm, useToast } from '../../components/Feedback';
-import { Chip, EmptyState, ErrorView, FilterPills, LoadingView, Screen, SubHeader, Thumb } from '../../components/ui';
+import { Chip, EmptyState, ErrorView, LoadingView, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
 import { RESERVATION_STATUS_LABEL } from '../../constants';
 import { useBoards } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { formatDate, won } from '../../utils/format';
+import { placeName } from '../../utils/place';
 import { STATUS_TONE } from '../home/ReservationManageScreen';
 
 type Filter = 'ALL' | ReservationStatus;
@@ -60,7 +61,7 @@ export default function MyReservationsScreen({ navigation }: ScreenProps<'MyRese
           <View style={{ flex: 1, justifyContent: 'center' }}>
             <Text style={styles.title} numberOfLines={1}>{board?.title ?? (board === null ? '삭제된 게시글' : '불러오는 중…')}</Text>
             <Text style={styles.price}>{item.quantity}개 · {won(item.subtotal)}</Text>
-            {!!board?.location && <Text style={styles.place}>{board.location}</Text>}
+            {!!board?.location && <Text style={styles.place}>{placeName(board.location)}</Text>}
           </View>
         </View>
         {item.status === 'PENDING' && (
@@ -80,7 +81,7 @@ export default function MyReservationsScreen({ navigation }: ScreenProps<'MyRese
   return (
     <Screen bg={colors.bgSub}>
       <SubHeader title="내 참여 신청 내역" />
-      <FilterPills options={FILTERS} value={filter} onChange={setFilter} />
+      <SegmentedTabs tabs={FILTERS} value={filter} onChange={setFilter} />
       {loading && !data ? (
         <LoadingView />
       ) : error && !data ? (

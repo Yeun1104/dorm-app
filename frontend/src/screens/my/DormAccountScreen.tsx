@@ -47,7 +47,7 @@ export default function DormAccountScreen({ navigation }: ScreenProps<'DormAccou
       {loading && !data ? (
         <LoadingView />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 18, paddingBottom: 28 }}>
           <View style={styles.status}>
             <View style={styles.icon}>
               <Icon name="dorm" size={31} color={colors.primaryDark} />
@@ -59,7 +59,7 @@ export default function DormAccountScreen({ navigation }: ScreenProps<'DormAccou
             </View>
             <Text style={styles.title}>{data?.linked ? '기숙사 계정이 연동되어 있어요' : '기숙사 계정이 연동되지 않았어요'}</Text>
             <Text style={styles.sub}>
-              {data?.linked ? '생활관 사이트의 기능을 숭팔이에서 바로 이용할 수 있어요.' : data && 'message' in data ? data.message : ''}
+              {data?.linked ? '생활관 사이트의 기능을 나눠도에서 바로 이용할 수 있어요.' : data && 'message' in data ? data.message : ''}
             </Text>
           </View>
 
@@ -80,10 +80,7 @@ export default function DormAccountScreen({ navigation }: ScreenProps<'DormAccou
             style={{ height: 48 }}
           />
 
-          <View style={styles.help}>
-            <Text style={styles.helpTitle}>계정 정보는 안전하게 보호돼요</Text>
-            <Text style={styles.helpText}>비밀번호는 서버에 암호화되어 저장되며 기숙사 사이트 연동 외의 목적으로 사용되지 않습니다.</Text>
-          </View>
+          <Text style={styles.help}>비밀번호는 암호화되어 저장되며, 기숙사 사이트 연동에만 사용돼요.</Text>
         </ScrollView>
       )}
     </Screen>
@@ -109,7 +106,6 @@ const styles = StyleSheet.create({
   row: { minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowLabel: { color: '#89928f', fontSize: font.sm },
   rowValue: { color: colors.text, fontSize: font.sm, fontWeight: '700' },
-  help: { marginTop: 14, padding: 13, borderRadius: 12, backgroundColor: '#f4f7f5' },
-  helpTitle: { fontSize: font.sm, fontWeight: '700', color: colors.text },
-  helpText: { marginTop: 3, color: '#89928f', fontSize: font.xs, lineHeight: 17 },
+  // 화면 맨 아래에 회색 안내 한 줄
+  help: { marginTop: 'auto', paddingTop: 24, textAlign: 'center', color: colors.textFaint, fontSize: font.xs, lineHeight: 17 },
 });

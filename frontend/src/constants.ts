@@ -21,6 +21,9 @@ export const REPORT_CATEGORIES: { value: ReportCategory; label: string }[] = [
   { value: 'FALSE_LISTING', label: '허위 매물' },
 ];
 
+/** 마이페이지 '문의하기' 메일 수신 주소 — TODO: 운영 문의 메일 정해지면 채우기 (비어 있으면 받는 사람 없이 메일 작성창만 열림) */
+export const SUPPORT_EMAIL = '';
+
 export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
   PENDING: '대기중',
   ACCEPTED: '수락됨',

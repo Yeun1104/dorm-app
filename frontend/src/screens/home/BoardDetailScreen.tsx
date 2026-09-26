@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Dimensions, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { boardApi } from '../../api/board';
@@ -8,6 +8,7 @@ import type { Board, Reservation } from '../../api/types';
 import { useMe } from '../../auth/AuthContext';
 import { boardProgress, BoardStatusChip } from '../../components/BoardCard';
 import { useConfirm, useToast } from '../../components/Feedback';
+import SaleCompleteSheet from '../../components/SaleCompleteSheet';
 import Icon from '../../components/Icon';
 import { Avatar, BottomSheet, Button, CountBadge, ErrorView, LoadingView, ProgressBar, Thumb } from '../../components/ui';
 import { invalidateBoard } from '../../hooks/useBoards';
@@ -16,6 +17,7 @@ import { useLikeToggle } from '../../hooks/useLikeToggle';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { timeAgo, won } from '../../utils/format';
+import { recentBoards } from '../../utils/recentBoards';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -47,9 +49,15 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [saleSheet, setSaleSheet] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
 
   const toggleLike = useLikeToggle((patch) => setData((d) => (d ? { ...d, board: { ...d.board, ...patch } } : d)));
+
+  const loadedBoard = data?.board;
+  useEffect(() => {
+    if (loadedBoard) recentBoards.add(loadedBoard).catch(() => {});
+  }, [loadedBoard?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading && !data) return <LoadingView />;
   if (error || !data) return <ErrorView message={error ?? '게시글을 불러오지 못했어요'} onRetry={reload} />;
@@ -129,9 +137,9 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
     bottom = (
       <View style={styles.ownerActions}>
         <Button
-          label={board.status === 'IN_PROGRESS' ? '모집완료' : '다시 모집'}
+          label={board.status === 'IN_PROGRESS' ? '판매완료' : '다시 모집'}
           variant="soft"
-          onPress={toggleBoardStatus}
+          onPress={board.status === 'IN_PROGRESS' ? () => setSaleSheet(true) : toggleBoardStatus}
           style={{ flex: 1 }}
         />
         <View style={{ flex: 2 }}>
@@ -210,10 +218,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
         <View style={styles.body}>
           <Pressable style={styles.authorRow} onPress={openAuthorProfile}>
             <Avatar name={board.authorNickname} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.authorName}>{board.authorNickname}{mine ? ' (나)' : ''}</Text>
-              <Text style={styles.authorSub}>좋아요 {board.likeCount}</Text>
-            </View>
+            <Text style={[styles.authorName, { flex: 1 }]}>{board.authorNickname}{mine ? ' (나)' : ''}</Text>
             <Icon name="chevron" size={18} color={colors.textFaint} />
           </Pressable>
 
@@ -270,8 +275,9 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
           <Icon name="back" color="white" />
         </Pressable>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable style={styles.roundBtn} onPress={() => toggleLike(board)}>
-            <Icon name="heart" color={board.liked ? colors.heart : 'white'} filled={board.liked} />
+          {/* TODO: 공유 API 생기면 연결 */}
+          <Pressable style={styles.roundBtn} onPress={() => toast('공유 기능은 준비 중이에요')}>
+            <Icon name="share" color="white" />
           </Pressable>
           {mine && (
             <Pressable style={styles.roundBtn} onPress={() => setMenu((v) => !v)}>
@@ -297,7 +303,21 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
         </View>
       )}
 
-      <View style={[styles.bottomAction, { paddingBottom: Math.max(insets.bottom, 14) + 8 }]}>{bottom}</View>
+      <View style={[styles.bottomAction, { paddingBottom: Math.max(insets.bottom, 14) + 8 }]}>
+        <Pressable style={styles.likeBtn} onPress={() => toggleLike(board)} hitSlop={4}>
+          <Icon name="heart" size={24} color={board.liked ? colors.heart : '#8d9692'} filled={board.liked} />
+        </Pressable>
+        {bottom}
+      </View>
+
+      {mine && (
+        <SaleCompleteSheet
+          board={board}
+          visible={saleSheet}
+          onClose={() => setSaleSheet(false)}
+          onDone={(updated) => setData({ ...data, board: { ...board, ...updated } })}
+        />
+      )}
 
       <BottomSheet visible={sheet} onClose={() => setSheet(false)}>
         <Text style={styles.sheetTitle}>몇 개 참여할까요?</Text>
@@ -348,7 +368,6 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 20 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: '#eef1ef' },
   authorName: { fontSize: font.base, fontWeight: '700', color: colors.text },
-  authorSub: { marginTop: 1, color: colors.textMuted, fontSize: font.xs },
   titleWrap: { paddingTop: 22, paddingBottom: 14 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 9, flexWrap: 'wrap' },
   title: { flexShrink: 1, fontSize: 21, fontWeight: '800', color: colors.text, letterSpacing: -0.8 },
@@ -379,6 +398,7 @@ const styles = StyleSheet.create({
   menuItem: { paddingHorizontal: 10, paddingVertical: 11 },
 
   bottomAction: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 13, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 15, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#e8ecea' },
+  likeBtn: { width: 40, height: 48, alignItems: 'center', justifyContent: 'center' },
   ownerActions: { flex: 1, flexDirection: 'row', gap: 10 },
   actionPrice: { flex: 1 },
   actionPriceLabel: { fontSize: font.xs, color: '#8d9692' },

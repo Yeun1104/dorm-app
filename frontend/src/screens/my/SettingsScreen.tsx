@@ -1,34 +1,70 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { errorMessage } from '../../api/client';
-import { userApi } from '../../api/user';
 import { useAuth } from '../../auth/AuthContext';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { BottomSheet, Button, Field, Input, Screen, SubHeader } from '../../components/ui';
+import { Screen, SubHeader } from '../../components/ui';
+import { clearBoardCache } from '../../hooks/useBoards';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
+import { HISTORY_SETTINGS_DEFAULTS, HistorySettings, historySettings } from '../../utils/historySettings';
+import { prefs } from '../../utils/prefs';
+
+const SWITCH_BLUE = '#3478f6';
+const switchColors = {
+  trackColor: { true: SWITCH_BLUE, false: '#dfe3e6' },
+  thumbColor: 'white',
+  ios_backgroundColor: '#dfe3e6',
+  // react-native-web 전용 prop (타입엔 없음)
+  ...({ activeThumbColor: 'white', activeTrackColor: SWITCH_BLUE } as object),
+};
+
+const NOTIFICATION_DEFAULTS = { push: true, chat: true, request: true, trade: true, notice: true };
+type NotificationSettings = typeof NOTIFICATION_DEFAULTS;
+
+const NOTIFICATION_ITEMS: { key: Exclude<keyof NotificationSettings, 'push'>; label: string; sub: string }[] = [
+  { key: 'chat', label: '채팅 메시지', sub: '새 채팅 메시지가 오면 알려드려요' },
+  { key: 'request', label: '참여 요청', sub: '내 글에 참여 요청이 오거나 내 요청이 수락·거절되면' },
+  { key: 'trade', label: '모집 · 거래 상태', sub: '참여한 공동구매가 모집완료·거래완료되면' },
+  { key: 'notice', label: '기숙사 공지사항', sub: '새 공지사항이 올라오면' },
+];
 
 export default function SettingsScreen(_: ScreenProps<'Settings'>) {
-  const { me, logout, withdraw, refreshMe } = useAuth();
+  const { me, logout, withdraw } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
-  const [nicknameSheet, setNicknameSheet] = useState(false);
-  const [nickname, setNickname] = useState(me?.nickname ?? '');
-  const [saving, setSaving] = useState(false);
+  const [noti, setNoti] = useState<NotificationSettings>(NOTIFICATION_DEFAULTS);
 
-  const saveNickname = async () => {
-    if (!nickname.trim()) return;
-    setSaving(true);
+  const [record, setRecord] = useState<HistorySettings>(HISTORY_SETTINGS_DEFAULTS);
+
+  useEffect(() => {
+    prefs.get('notifications', NOTIFICATION_DEFAULTS).then(setNoti);
+    historySettings.get().then(setRecord);
+  }, []);
+
+  const updateRecord = (patch: Partial<HistorySettings>) => {
+    const next = { ...record, ...patch };
+    setRecord(next);
+    historySettings.set(next).catch(() => toast('설정을 저장하지 못했어요'));
+  };
+
+  const updateNoti = (patch: Partial<NotificationSettings>) => {
+    const next = { ...noti, ...patch };
+    setNoti(next);
+    prefs.set('notifications', next).catch(() => toast('설정을 저장하지 못했어요'));
+  };
+
+  const clearCache = async () => {
+    const ok = await confirm({ title: '캐시를 삭제할까요?', message: '저장된 이미지와 임시 데이터를 지워요. 로그인 정보와 설정은 유지돼요.', confirmText: '삭제' });
+    if (!ok) return;
     try {
-      await userApi.updateNickname(nickname.trim());
-      await refreshMe();
-      setNicknameSheet(false);
-      toast('닉네임을 변경했어요');
+      clearBoardCache();
+      await Promise.all([Image.clearMemoryCache(), Image.clearDiskCache()]);
+      toast('캐시를 삭제했어요');
     } catch (e) {
-      toast(errorMessage(e));
-    } finally {
-      setSaving(false);
+      toast(errorMessage(e, '캐시를 삭제하지 못했어요'));
     }
   };
 
@@ -54,17 +90,64 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
       <ScrollView contentContainerStyle={{ padding: 18 }}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>계정 정보</Text>
-          <Pressable style={styles.item} onPress={() => setNicknameSheet(true)}>
-            <Text style={styles.itemText}>닉네임 변경</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={styles.itemValue}>{me?.nickname}</Text>
-              <Icon name="chevron" size={17} color={colors.textMuted} />
-            </View>
-          </Pressable>
           <View style={[styles.item, { borderBottomWidth: 0 }]}>
             <Text style={styles.itemText}>이메일</Text>
             <Text style={styles.itemValue}>{me?.email}</Text>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>알림</Text>
+          <View style={styles.item}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>푸시 알림</Text>
+              <Text style={styles.itemSub}>끄면 모든 알림을 받지 않아요</Text>
+            </View>
+            <Switch value={noti.push} onValueChange={(v) => updateNoti({ push: v })} {...switchColors} />
+          </View>
+          {NOTIFICATION_ITEMS.map((n, i) => (
+            <View key={n.key} style={[styles.item, i === NOTIFICATION_ITEMS.length - 1 && { borderBottomWidth: 0 }, !noti.push && { opacity: 0.45 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemText}>{n.label}</Text>
+                <Text style={styles.itemSub}>{n.sub}</Text>
+              </View>
+              <Switch
+                value={noti.push && noti[n.key]}
+                disabled={!noti.push}
+                onValueChange={(v) => updateNoti({ [n.key]: v })}
+                {...switchColors}
+              />
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>기록</Text>
+          <View style={styles.item}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>최근 검색 기록 저장</Text>
+              <Text style={styles.itemSub}>끄면 검색어를 기록하지 않아요</Text>
+            </View>
+            <Switch value={record.search} onValueChange={(v) => updateRecord({ search: v })} {...switchColors} />
+          </View>
+          <View style={[styles.item, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>최근 본 게시글 저장</Text>
+              <Text style={styles.itemSub}>끄면 본 게시글을 기록하지 않아요</Text>
+            </View>
+            <Switch value={record.viewed} onValueChange={(v) => updateRecord({ viewed: v })} {...switchColors} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>저장 공간</Text>
+          <Pressable style={[styles.item, { borderBottomWidth: 0 }]} onPress={clearCache}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>캐시 삭제</Text>
+              <Text style={styles.itemSub}>이미지·게시글 임시 데이터를 지워요</Text>
+            </View>
+            <Icon name="chevron" size={17} color={colors.textMuted} />
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -86,13 +169,6 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
         </View>
       </ScrollView>
 
-      <BottomSheet visible={nicknameSheet} onClose={() => setNicknameSheet(false)}>
-        <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>닉네임 변경</Text>
-        <Field label="새 닉네임">
-          <Input value={nickname} onChangeText={setNickname} maxLength={20} autoFocus />
-        </Field>
-        <Button label="저장" onPress={saveNickname} loading={saving} style={{ marginTop: 8 }} />
-      </BottomSheet>
     </Screen>
   );
 }
@@ -100,7 +176,8 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
 const styles = StyleSheet.create({
   section: { marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'white' },
   sectionTitle: { paddingHorizontal: 15, paddingTop: 14, paddingBottom: 7, color: '#7f8a85', fontSize: font.xs, fontWeight: '700' },
-  item: { minHeight: 54, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  item: { minHeight: 54, paddingHorizontal: 15, paddingVertical: 10, gap: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   itemText: { fontSize: font.base, color: colors.text },
+  itemSub: { marginTop: 2, fontSize: font.xs, color: colors.textMuted },
   itemValue: { fontSize: font.sm, color: colors.textMuted },
 });

@@ -10,6 +10,10 @@ import type { LeaveKind } from '../api/dorm';
 export type AppStackParamList = {
   // 공동구매
   Home: undefined;
+  /** 공동구매 검색. searched는 화면이 직접 갱신 (검색 결과를 보는 중엔 탭바 숨김) */
+  BoardSearch: { searched?: boolean } | undefined;
+  /** 알림 목록 */
+  Notifications: undefined;
   /** boardId가 있으면 수정 모드 */
   BoardWrite: { boardId?: number } | undefined;
   BoardDetail: { boardId: number };
