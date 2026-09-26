@@ -8,10 +8,11 @@ import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
 import { Button, Chip, EmptyState, ErrorView, Fab, Field, FormScroll, Input, LoadingView, Screen, SubHeader } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
+import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { daysBetween, parseLocalDate, toLocalDateString } from '../../utils/format';
-import { dormStatusTone, PAGE_SIZE, Pager } from './dormShared';
+import { dormStatusTone, LEAVE_PAGE_SIZE, Pager } from './dormShared';
 
 const TEXT: Record<LeaveKind, { title: string; subtitle: string; guideTitle: string; guide: string }> = {
   outing: {
@@ -42,8 +43,7 @@ function validateRange(kind: LeaveKind, start: Date | null, end: Date | null): s
 export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>) {
   const { kind } = route.params;
   const t = TEXT[kind];
-  const [page, setPage] = useState(0);
-  const { data, error, loading, refreshing, reload, refresh } = useFetch(() => leaveApi.list(kind, page), [kind, page], { refetchOnFocus: true });
+  const list = useSlicedPages((page) => leaveApi.list(kind, page), LEAVE_PAGE_SIZE, LEAVE_PAGE_SIZE, [kind]);
 
   const renderItem = ({ item }: { item: OutingListItem }) => (
     <Pressable
@@ -67,17 +67,17 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
   return (
     <Screen bg={colors.bgSub}>
       <SubHeader title={t.title} subtitle={t.subtitle} />
-      {loading && !data ? (
+      {list.loading && !list.items ? (
         <LoadingView />
-      ) : error && !data ? (
-        <ErrorView message={error} onRetry={reload} />
+      ) : list.error && !list.items ? (
+        <ErrorView message={list.error} onRetry={list.reload} />
       ) : (
         <FlatList
-          data={data ?? []}
+          data={list.items ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.refresh} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View style={styles.guide}>
               <View style={styles.guideIcon}>
@@ -90,7 +90,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
             </View>
           }
           ListEmptyComponent={<EmptyState icon="calendar" title="신청 내역이 없어요" />}
-          ListFooterComponent={<Pager page={page} hasNext={(data?.length ?? 0) >= PAGE_SIZE} loading={loading} onChange={setPage} />}
+          ListFooterComponent={<Pager page={list.page} pagesInBlock={list.pagesInBlock} hasNextBlock={list.hasNextBlock} loading={list.loading} onChange={list.goTo} />}
         />
       )}
       <Fab label="신청하기" onPress={() => navigation.navigate('LeaveForm', { kind })} />

@@ -2,18 +2,21 @@ import { useFocusEffect } from '@react-navigation/native';
 import { DependencyList, useCallback, useEffect, useRef, useState } from 'react';
 import { errorMessage } from '../api/client';
 
+/** 페이지 번호를 몇 개씩 묶어 보여줄지 (1~5, 6~10 …) */
+export const PAGE_BLOCK = 5;
+
 /**
  * 서버(=기숙사 사이트)는 한 페이지에 serverSize개씩 주는데, 폰 한 화면에 스크롤 없이 들어오도록
- * uiSize개씩 다시 잘라서 보여주는 페이징.
- * - 필요한 서버 페이지만 받아서 캐시하고, 화면 페이지 경계가 서버 페이지 끝에 걸리면 다음 서버 페이지를 미리 받아
- *   '다음' 버튼 활성 여부를 정확히 판단함
- * - deps(검색어 등)가 바뀌면 캐시를 비우고 첫 페이지부터
- * - 화면에 다시 들어오면(글 작성 후 등) 캐시를 비우고 현재 페이지를 조용히 다시 받음
+ * uiSize개씩 다시 잘라서 보여주는 페이징. 사이트가 전체 개수를 안 알려줘서 번호 묶음(PAGE_BLOCK개) 단위로 파악함.
+ * 1) 지금 페이지를 보여줄 만큼만 먼저 받아 바로 표시
+ * 2) 이어서 같은 묶음의 나머지(+다음 묶음 존재 여부 확인용 1개)를 뒤에서 받아 번호 개수를 채움
+ * - 받은 서버 페이지는 캐시. deps(검색어 등)가 바뀌거나 화면에 다시 들어오면 캐시를 비움
  */
 export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]>, serverSize: number, uiSize: number, deps: DependencyList) {
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<T[] | null>(null);
-  const [hasNext, setHasNext] = useState(false);
+  const [pagesInBlock, setPagesInBlock] = useState(1);
+  const [hasNextBlock, setHasNextBlock] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,33 +38,55 @@ export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]
       const id = ++reqId.current;
       if (mode === 'initial') setLoading(true);
       if (mode === 'refresh') setRefreshing(true);
-      try {
-        const start = uiPage * uiSize;
-        const end = start + uiSize;
-        const first = Math.floor(start / serverSize);
-        const collected: T[] = [];
-        // 이 화면 페이지 + (다음이 있는지 알 수 있을 만큼) 서버 페이지를 차례로 받음
-        let sp = first;
-        while (first * serverSize + collected.length < end + 1) {
+
+      const blockSize = PAGE_BLOCK * uiSize;
+      const blockStart = Math.floor(uiPage / PAGE_BLOCK) * blockSize;
+      const first = Math.floor(blockStart / serverSize);
+      const base = first * serverSize; // collected[0]의 전체 기준 위치
+      const collected: T[] = [];
+      let sp = first;
+      let ended = false;
+      /** 전체 기준 upTo개(미만)까지 모일 때까지 서버 페이지를 차례로 받음 */
+      const fillUntil = async (upTo: number) => {
+        while (!ended && base + collected.length < upTo) {
           const list = await serverPage(sp);
           collected.push(...list);
-          if (list.length < serverSize) break; // 마지막 서버 페이지
+          if (list.length < serverSize) ended = true; // 마지막 서버 페이지
           sp++;
         }
+      };
+      const apply = () => {
+        const inBlock = Math.max(0, Math.min(collected.length - (blockStart - base), blockSize));
+        setPagesInBlock(Math.max(1, Math.ceil(inBlock / uiSize)));
+        // 묶음 끝 다음 1개까지 받아두므로, 그게 있으면 다음 묶음이 있음
+        setHasNextBlock(collected.length - (blockStart - base) > blockSize);
+      };
+
+      try {
+        // 1) 현재 페이지 (+ 다음 페이지 존재 확인용 1개)
+        const start = uiPage * uiSize;
+        await fillUntil(start + uiSize + 1);
         if (id !== reqId.current) return;
-        const offset = start - first * serverSize;
-        setItems(collected.slice(offset, offset + uiSize));
-        // 루프가 페이지 끝 다음 1개까지 받아두므로, 그게 있으면 다음 페이지가 있음
-        setHasNext(collected.length > offset + uiSize);
+        setItems(collected.slice(start - base, start - base + uiSize));
         setPage(uiPage);
+        apply();
         setError(null);
       } catch (e) {
         if (id === reqId.current && mode !== 'silent') setError(errorMessage(e));
+        return;
       } finally {
         if (id === reqId.current) {
           setLoading(false);
           setRefreshing(false);
         }
+      }
+
+      // 2) 같은 묶음의 나머지는 뒤에서 (번호 개수·다음 묶음 여부)
+      try {
+        await fillUntil(blockStart + blockSize + 1);
+        if (id === reqId.current) apply();
+      } catch {
+        // 번호 채우기 실패는 조용히 무시 (지금 페이지는 이미 표시됨)
       }
     },
     [serverPage, serverSize, uiSize],
@@ -91,7 +116,9 @@ export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]
   return {
     items,
     page,
-    hasNext,
+    /** 현재 번호 묶음(1~5 등)에 실제로 있는 페이지 수 */
+    pagesInBlock,
+    hasNextBlock,
     loading,
     refreshing,
     error,
