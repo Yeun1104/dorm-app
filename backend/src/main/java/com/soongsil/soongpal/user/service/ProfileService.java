@@ -5,6 +5,7 @@ import com.soongsil.soongpal.board.domain.BoardStatus;
 import com.soongsil.soongpal.board.repository.BoardRepository;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
+import com.soongsil.soongpal.dorm.repository.DormAccountRepository;
 import com.soongsil.soongpal.manner.dto.MannerBadgeDto;
 import com.soongsil.soongpal.manner.service.MannerReviewService;
 import com.soongsil.soongpal.reservation.domain.ReservationStatus;
@@ -29,6 +30,7 @@ public class ProfileService {
     private final BoardRepository boardRepository;
     private final ReservationRepository reservationRepository;
     private final MannerReviewService mannerReviewService;
+    private final DormAccountRepository dormAccountRepository;
 
     @Transactional(readOnly = true)
     public ProfileResDto getProfile(Long targetUserId) {
@@ -52,9 +54,13 @@ public class ProfileService {
 
         List<MannerBadgeDto> topBadges = mannerReviewService.getTopBadges(targetUserId, TOP_BADGE_COUNT);
 
+        boolean dormVerified = dormAccountRepository.findByUserId(targetUserId).isPresent();
+
         return ProfileResDto.builder()
                 .userId(user.getId())
                 .nickname(user.getNickName())
+                .schoolVerified(user.isSchoolVerified())
+                .dormVerified(dormVerified)
                 .tradeCount((int) (completedAsBuyer + completedAsSeller))
                 .topMannerBadges(topBadges)
                 .inProgressBoards(inProgressBoards)
