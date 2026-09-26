@@ -67,19 +67,27 @@ export function SpointScreen(_: ScreenProps<'Spoint'>) {
 
 // ───────── 입사신청/선발내역 ─────────
 
+/** 룸메이트 칸: '확정'이면 강조색, 그 외(미확정/대기 등)는 회색 */
+const roommateConfirmed = (info: string) => /확정/.test(info) && !/미확정|불/.test(info);
+
 export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
   const { data, error, loading, refreshing, reload, refresh } = useFetch(() => ipsaApi.list(), []);
 
   const renderItem = ({ item }: { item: IpsaListItem }) => (
     <Pressable style={styles.ipsaCard} onPress={() => navigation.navigate('IpsaDetail', { mozipCode: item.mozipCode, title: item.recruitType })}>
-      <View style={{ flex: 1, gap: 6 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <Chip label={item.selectionStatus || '-'} tone={dormStatusTone(item.selectionStatus)} />
           <Text style={styles.ipsaTitle} numberOfLines={1}>{item.recruitType}</Text>
         </View>
         <Text style={styles.ipsaMeta}>거주기간 {item.residencePeriod || '-'}</Text>
-        {!!item.roommateInfo && <Text style={styles.ipsaMeta}>룸메이트 {item.roommateInfo}</Text>}
       </View>
+      {!!item.roommateInfo && (
+        <View style={[styles.roommate, roommateConfirmed(item.roommateInfo) && styles.roommateOn]}>
+          <Text style={styles.roommateLabel}>룸메이트</Text>
+          <Text style={[styles.roommateValue, roommateConfirmed(item.roommateInfo) && styles.roommateValueOn]} numberOfLines={1}>{item.roommateInfo}</Text>
+        </View>
+      )}
       <Icon name="chevron" size={18} color="#9aa29f" />
     </Pressable>
   );
@@ -98,6 +106,12 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
           renderItem={renderItem}
           contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+          ListHeaderComponent={
+            <View style={styles.ipsaNotice}>
+              <Icon name="notice" size={16} color={colors.textBody} />
+              <Text style={styles.ipsaNoticeText}>입사 신청은 기숙사 사이트에서 할 수 있어요. 여기서는 신청·선발 내역만 확인할 수 있어요.</Text>
+            </View>
+          }
           ListEmptyComponent={<EmptyState icon="doc" title="입사신청 내역이 없어요" />}
         />
       )}
@@ -331,6 +345,13 @@ const styles = StyleSheet.create({
   ipsaCard: { marginBottom: 10, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, borderWidth: 1, borderColor: '#e6ebe9', backgroundColor: 'white' },
   ipsaTitle: { flexShrink: 1, fontSize: font.base, fontWeight: '700', color: colors.text },
   ipsaMeta: { fontSize: font.xs, color: colors.textMuted },
+  ipsaNotice: { marginBottom: 14, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, backgroundColor: '#eef2f1' },
+  ipsaNoticeText: { flex: 1, fontSize: font.sm, lineHeight: 19, color: colors.textBody },
+  roommate: { maxWidth: 110, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', borderRadius: 12, backgroundColor: '#f1f3f2' },
+  roommateOn: { backgroundColor: colors.primarySoft2 },
+  roommateLabel: { fontSize: 10, color: colors.textMuted },
+  roommateValue: { marginTop: 1, fontSize: font.sm, fontWeight: '700', color: colors.textBody },
+  roommateValueOn: { color: colors.primaryDeep },
   fieldTable: { borderWidth: 1, borderColor: '#e6ebe9', borderRadius: 16, overflow: 'hidden' },
   fieldRow: { paddingHorizontal: 14, paddingVertical: 13, flexDirection: 'row', gap: 12 },
   fieldDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
