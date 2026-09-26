@@ -101,6 +101,7 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
         <ErrorView message={error} onRetry={reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={data ?? []}
           keyExtractor={(i) => String(i.mozipCode)}
           renderItem={renderItem}
@@ -300,7 +301,7 @@ export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
       ) : error || !data ? (
         <ErrorView message={error ?? '식단을 불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 28 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 28 }}>
           <View style={styles.dayTabs}>
             {data.days.map((d, i) => {
               const active = i === dayIndex;

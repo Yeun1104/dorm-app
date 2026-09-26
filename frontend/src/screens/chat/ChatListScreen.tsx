@@ -125,6 +125,7 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
         <ErrorView message={rooms.error} onRetry={rooms.reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={rooms.data ?? []}
           keyExtractor={(r) => String(r.id)}
           renderItem={renderRoom}

@@ -191,7 +191,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* 이미지 */}
         {board.images.length > 0 ? (
           <View>

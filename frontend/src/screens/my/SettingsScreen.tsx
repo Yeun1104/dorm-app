@@ -59,7 +59,7 @@ export default function SettingsScreen({ navigation }: ScreenProps<'Settings'>) 
   return (
     <Screen bg={colors.bgSub}>
       <SubHeader title="설정" />
-      <ScrollView contentContainerStyle={{ padding: 18 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18 }}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>계정 정보</Text>
           <View style={[styles.item, { borderBottomWidth: 0 }]}>

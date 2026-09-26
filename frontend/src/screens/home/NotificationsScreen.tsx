@@ -114,6 +114,7 @@ export default function NotificationsScreen(_: ScreenProps<'Notifications'>) {
   else
     body = (
       <FlatList
+        showsVerticalScrollIndicator={false}
         data={items}
         keyExtractor={(n) => String(n.id)}
         contentContainerStyle={{ padding: 18, paddingBottom: 40, flexGrow: 1 }}

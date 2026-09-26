@@ -271,6 +271,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={insets.top}>
         <FlatList
+          showsVerticalScrollIndicator={false}
           style={{ flex: 1, backgroundColor: colors.chatBg }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14 }}
           data={messages}

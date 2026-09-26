@@ -73,6 +73,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
         <ErrorView message={list.error} onRetry={list.reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={list.items ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
@@ -130,7 +131,7 @@ export function LeaveDetailScreen({ navigation, route }: ScreenProps<'LeaveDetai
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Chip label={data.resultStatus || '상태 없음'} tone={dormStatusTone(data.resultStatus)} large />
             <Text style={styles.cardNo}>신청번호 {data.applicationNo}</Text>

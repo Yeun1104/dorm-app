@@ -49,7 +49,7 @@ export default function NotificationSettingsScreen(_: ScreenProps<'NotificationS
       {!noti ? (
         <LoadingView />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18 }}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>받을 알림</Text>
             {NOTIFICATION_ITEMS.map((n, i) => (

@@ -100,6 +100,7 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
         <ErrorView message={list.error} onRetry={list.reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={list.items ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
@@ -182,7 +183,7 @@ export function RepairDetailScreen({ navigation, route }: ScreenProps<'RepairDet
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.detail.title} meta={[data.detail.writer, `조회 ${data.detail.viewCount}`, data.detail.writtenAt]} />
           <View style={styles.visit}>
             <Text style={styles.visitLabel}>방이 비어있을 때 방문</Text>
@@ -212,7 +213,7 @@ export function NoticeDetailScreen({ route }: ScreenProps<'NoticeDetail'>) {
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.title} meta={[data.writer, `조회 ${data.viewCount}`, data.writtenAt]} />
           {data.blocks?.length ? (
             data.blocks.map((block, i) => <NoticeBlockView key={i} block={block} />)
@@ -284,7 +285,7 @@ export function InquiryDetailScreen({ navigation, route }: ScreenProps<'InquiryD
           <EmptyState icon="lock" title="🔒 비밀글입니다" message="작성자와 관리자만 볼 수 있어요." />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.detail.title} meta={[data.detail.writer, `조회 ${data.detail.viewCount}`, data.detail.writtenAt]} />
           <Text style={detailStyles.body}>{data.detail.content}</Text>
           {!!data.detail.staffReply && (
