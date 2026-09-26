@@ -240,7 +240,9 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
 
           <View style={styles.progressCard}>
             <View style={styles.progressHead}>
-              <Text style={styles.progressTitle}>{collected}개 모였어요</Text>
+              <Text style={styles.progressTitle}>
+                {collected}개 모였어요 <Text style={styles.participants}>· {board.participantCount}명 참여</Text>
+              </Text>
               <Text style={styles.progressPct}>{Math.round(progress * 100)}%</Text>
             </View>
             <ProgressBar ratio={progress} />
@@ -381,6 +383,7 @@ const styles = StyleSheet.create({
   progressCard: { padding: 18, borderWidth: 1, borderColor: '#d8e8ed', borderRadius: 17 },
   progressHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   progressTitle: { fontSize: font.base, fontWeight: '700', color: colors.text },
+  participants: { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },
   progressPct: { fontSize: font.base, fontWeight: '700', color: colors.primaryDark },
   progressHint: { marginTop: 8, color: '#84908b', fontSize: font.xs },
   waitingHint: { marginTop: 4, color: '#e2763f', fontSize: font.xs, fontWeight: '700' },

@@ -40,7 +40,9 @@ export function ProductCard({ board, onPress, onToggleLike }: { board: Board; on
         <View style={styles.progressWrap}>
           <ProgressBar ratio={boardProgress(board)} height={8} />
           <View style={styles.progressLabel}>
-            <Text style={styles.progressStrong}>{collected}개 모였어요</Text>
+            <Text style={styles.progressStrong}>
+              {collected}개 모였어요{board.participantCount > 0 && <Text style={styles.progressMuted}> · {board.participantCount}명</Text>}
+            </Text>
             <Text style={styles.progressMuted}>{board.remainingQuantity}개 남음</Text>
           </View>
           {board.waitingCount > 0 && (
