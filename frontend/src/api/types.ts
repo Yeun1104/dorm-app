@@ -32,6 +32,8 @@ export interface Board {
   unitPrice: number;
   remainingQuantity: number;
   waitingCount: number;
+  /** 참여 확정(수락·거래완료)된 서로 다른 사람 수 */
+  participantCount: number;
   url: string | null;
   location: string | null;
   category: BoardCategory;
@@ -108,6 +110,8 @@ export interface ChatRoom {
   lastMessageTime: string | null;
   /** 내가 안 읽은(상대가 보낸) 메시지 수 */
   unreadCount: number | null;
+  /** 이 채팅방 알림을 껐는지 (방 상세/목록 조회에서만 채워짐) */
+  notificationMuted: boolean;
 }
 
 export interface ChatMessage {
@@ -192,10 +196,10 @@ export interface Profile {
   nickname: string;
   tradeCount: number;
   topMannerBadges: MannerBadge[];
-  /** 기숙사 계정 연동(인증) 여부 — TODO: 백엔드 ProfileResDto에 아직 없음. 오면 배지 표시 */
-  dormVerified?: boolean;
-  /** 학교(u-saint) 인증 여부 — TODO: 백엔드 User.schoolVerified를 ProfileResDto로 내려줘야 함 */
-  schoolVerified?: boolean;
+  /** 기숙사 계정 연동 여부 (인증 배지) */
+  dormVerified: boolean;
+  /** 학교(u-saint) 인증 여부 (인증 배지) */
+  schoolVerified: boolean;
   inProgressBoards: BoardSummary[];
   completedBoards: BoardSummary[];
 }
@@ -347,6 +351,8 @@ export interface InquiryDetail {
   viewCount: number;
   writtenAt: string;
   content: string;
+  /** 운영사무실 답변 (없으면 null) */
+  staffReply: string | null;
 }
 
 export interface InquiryCreateReq {
@@ -420,4 +426,42 @@ export interface FoodMenuRes {
   days: FoodMenuDay[];
   prevWeek: FoodMenuWeekNav | null;
   nextWeek: FoodMenuWeekNav | null;
+}
+
+// ───────── 알림 ─────────
+
+export type NotificationType =
+  | 'RESERVATION_REQUESTED' // 내 글에 참여 요청이 옴
+  | 'RESERVATION_ACCEPTED' // 내 참여 요청이 수락됨
+  | 'RESERVATION_REJECTED' // 내 참여 요청이 거절됨
+  | 'BOARD_SOLD_OUT' // 참여한 공동구매가 모집완료됨
+  | 'RESERVATION_COMPLETED' // 거래완료 (매너 평가 유도)
+  | 'DORM_NOTICE'; // 기숙사 새 공지
+
+export interface AppNotification {
+  id: number;
+  type: NotificationType;
+  title: string;
+  body: string;
+  relatedBoardId: number | null;
+  relatedChatRoomId: number | null;
+  relatedReservationId: number | null;
+  read: boolean;
+  createdAt: string;
+}
+
+/** 알림 카테고리별 on/off — PUT 때는 4개 모두 보내야 함 */
+export interface NotificationPreference {
+  chatEnabled: boolean;
+  reservationEnabled: boolean;
+  boardStatusEnabled: boolean;
+  dormNoticeEnabled: boolean;
+}
+
+/** Spring Data Page 기본 직렬화 (필요한 필드만) */
+export interface SpringPage<T> {
+  content: T[];
+  number: number;
+  totalPages: number;
+  last: boolean;
 }

@@ -46,6 +46,8 @@ export const chatApi = {
     patch<string>(`/api/chat/rooms/${roomId}/read`, null, { params: { messageId } }),
   /** DELETE /api/chat/rooms/{roomId}/leave — 채팅방 나가기(목록에서 삭제) */
   leave: (roomId: number) => del<ChatRoom>(`/api/chat/rooms/${roomId}/leave`),
+  /** PATCH /api/chat/rooms/{roomId}/notification — 이 채팅방 알림 끄기(true)/켜기(false) */
+  setMuted: (roomId: number, muted: boolean) => patch<string>(`/api/chat/rooms/${roomId}/notification`, { muted }),
 };
 
 export const mannerApi = {
@@ -54,6 +56,9 @@ export const mannerApi = {
   /** POST /api/reservations/{id}/manner-review — 1~3개 */
   review: (reservationId: number, keywords: MannerKeywordType[]) =>
     post<MannerReviewRes>(`/api/reservations/${reservationId}/manner-review`, { keywords }),
+  /** GET /api/reservations/{id}/manner-review/status — 내가 이 거래를 이미 평가했는지 (서버 기준) */
+  reviewed: async (reservationId: number) =>
+    (await get<{ reviewed: boolean }>(`/api/reservations/${reservationId}/manner-review/status`)).reviewed,
 };
 
 export const reportApi = {
