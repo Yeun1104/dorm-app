@@ -119,11 +119,15 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
   );
 }
 
-/** 상세 필드 중 위쪽 요약 카드로 뺄 항목 (사이트 라벨이 건마다 조금씩 달라 키워드로 찾음) */
+/** 상세 필드 중 위쪽 요약으로 뺄 항목 (사이트 라벨이 건마다 조금씩 달라 키워드로 찾음) */
 const STATUS_KEY = /선발|합격|결과|상태/;
 const PERIOD_KEY = /기간/;
-/** 값이 이보다 길면 타일을 한 줄 전체로 */
-const LONG_VALUE = 14;
+
+/** "2026-02-26 ~ 2026-06-17" → ['2026-02-26', '~ 2026-06-17'] (시작/종료를 두 줄로) */
+const splitPeriod = (v: string) => {
+  const [from, to] = v.split(/\s*~\s*/);
+  return to ? [from, `~ ${to}`] : [v];
+};
 
 export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
   const { mozipCode, title } = route.params;
@@ -145,28 +149,35 @@ export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
         <EmptyState icon="doc" title="표시할 정보가 없어요" />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-          {/* 요약: 모집구분 · 선발 결과 · 거주기간 */}
+          {/* 요약: 선발 결과 / 모집구분 ─ (달력) 기간 */}
           <View style={styles.ipsaHero}>
-            <View style={styles.ipsaHeroTop}>
-              <Text style={styles.ipsaHeroTitle} numberOfLines={2}>{title}</Text>
-              {status && <Chip label={status[1]} tone={dormStatusTone(status[1])} large />}
-            </View>
-            {period && (
-              <View style={styles.ipsaPeriod}>
-                <Icon name="calendar" size={15} color={colors.primaryDeep} />
-                <Text style={styles.ipsaPeriodLabel}>{period[0]}</Text>
-                <Text style={styles.ipsaPeriodValue} numberOfLines={1}>{period[1]}</Text>
+            {status && (
+              <View style={{ alignSelf: 'flex-start', marginBottom: 10 }}>
+                <Chip label={status[1]} tone={dormStatusTone(status[1])} />
               </View>
             )}
+            <View style={styles.ipsaHeroRow}>
+              <Text style={styles.ipsaHeroTitle}>{title}</Text>
+              {period && (
+                <View style={styles.ipsaPeriod}>
+                  <Icon name="calendar" size={15} color={colors.primaryDeep} />
+                  <View>
+                    {splitPeriod(period[1]).map((line) => (
+                      <Text key={line} style={styles.ipsaPeriodText}>{line}</Text>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
 
-          {/* 나머지 항목: 2열 타일, 긴 값은 한 줄 전체 */}
+          {/* 나머지 항목: 라벨 ··· 값 한 줄씩 */}
           {rest.length > 0 && (
-            <View style={styles.tiles}>
-              {rest.map(([label, value]) => (
-                <View key={label} style={[styles.tile, value.length > LONG_VALUE && styles.tileWide]}>
-                  <Text style={styles.tileLabel} numberOfLines={1}>{label}</Text>
-                  <Text style={styles.tileValue}>{value}</Text>
+            <View style={styles.ipsaList}>
+              {rest.map(([label, value], i) => (
+                <View key={label} style={[styles.ipsaRow, i < rest.length - 1 && styles.ipsaRowDivider]}>
+                  <Text style={styles.ipsaRowLabel}>{label}</Text>
+                  <Text style={styles.ipsaRowValue}>{value}</Text>
                 </View>
               ))}
             </View>
@@ -382,16 +393,15 @@ const styles = StyleSheet.create({
   roommateValue: { marginTop: 1, fontSize: font.sm, fontWeight: '700', color: colors.textBody },
   roommateValueOn: { color: colors.primaryDeep },
   ipsaHero: { padding: 18, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
-  ipsaHeroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  ipsaHeroTitle: { flex: 1, fontSize: 18, lineHeight: 24, fontWeight: '800', color: colors.text },
-  ipsaPeriod: { marginTop: 14, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, backgroundColor: colors.primarySoft2 },
-  ipsaPeriodLabel: { fontSize: font.xs, fontWeight: '700', color: colors.primaryDeep },
-  ipsaPeriodValue: { flex: 1, textAlign: 'right', fontSize: font.sm, fontWeight: '700', color: colors.primaryDeep },
-  tiles: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  tile: { width: '48.5%', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
-  tileWide: { width: '100%' },
-  tileLabel: { fontSize: font.xs, color: colors.textMuted },
-  tileValue: { marginTop: 4, fontSize: font.md, lineHeight: 20, fontWeight: '700', color: colors.text },
+  ipsaHeroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  ipsaHeroTitle: { flex: 1, fontSize: 17, lineHeight: 23, fontWeight: '800', color: colors.text },
+  ipsaPeriod: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ipsaPeriodText: { fontSize: font.sm, lineHeight: 18, fontWeight: '600', color: colors.primaryDeep },
+  ipsaList: { marginTop: 12, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
+  ipsaRow: { minHeight: 48, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  ipsaRowDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  ipsaRowLabel: { fontSize: font.md, color: colors.textMuted },
+  ipsaRowValue: { flex: 1, textAlign: 'right', fontSize: font.md, lineHeight: 20, fontWeight: '700', color: colors.text },
 
   weekNav: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   weekBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: '#e1e6e4', backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
