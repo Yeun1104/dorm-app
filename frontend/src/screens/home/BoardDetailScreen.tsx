@@ -262,12 +262,6 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
             )}
           </View>
 
-          {!mine && (
-            <View style={styles.safeNote}>
-              <Text style={styles.safeTitle}>안심하고 거래하세요</Text>
-              <Text style={styles.safeText}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
-            </View>
-          )}
         </View>
       </ScrollView>
 
@@ -341,6 +335,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
           <Text style={{ fontSize: font.md, fontWeight: '800' }}>{won(board.unitPrice * quantity)}</Text>
         </View>
         <Button label="참여 요청 보내기" onPress={sendRequest} loading={busy} />
+        <Text style={styles.sheetNote}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
       </BottomSheet>
     </View>
   );
@@ -391,9 +386,6 @@ const styles = StyleSheet.create({
   infoRow: { minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   infoLabel: { color: '#89928f', fontSize: font.sm },
   infoValue: { color: colors.text, fontSize: font.sm, fontWeight: '600', flexShrink: 1, textAlign: 'right', marginLeft: 12 },
-  safeNote: { marginTop: 14, padding: 15, borderRadius: 14, backgroundColor: '#fff9e9' },
-  safeTitle: { fontSize: font.sm, fontWeight: '700', color: '#9b751d' },
-  safeText: { marginTop: 3, color: '#95865f', fontSize: font.xs },
 
   overlayHeader: { position: 'absolute', left: 15, right: 15, flexDirection: 'row', justifyContent: 'space-between' },
   roundBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(10,22,18,0.38)', alignItems: 'center', justifyContent: 'center' },
@@ -414,6 +406,7 @@ const styles = StyleSheet.create({
   rejected: { marginBottom: 8, color: colors.warning, fontSize: font.sm, fontWeight: '700' },
 
   sheetTitle: { fontSize: 21, fontWeight: '800', color: colors.text, marginBottom: 5 },
+  sheetNote: { marginTop: 10, textAlign: 'center', fontSize: font.xs, color: colors.textMuted },
   sheetSub: { color: '#858f8b', fontSize: font.sm },
   qtyControl: { marginVertical: 25, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 34 },
   qtyBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#dfe6e3', alignItems: 'center', justifyContent: 'center' },
