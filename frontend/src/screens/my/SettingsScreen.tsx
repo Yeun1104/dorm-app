@@ -2,6 +2,8 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { errorMessage } from '../../api/client';
+import { notificationApi } from '../../api/notification';
+import type { NotificationPreference } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
@@ -10,7 +12,6 @@ import { clearBoardCache } from '../../hooks/useBoards';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { HISTORY_SETTINGS_DEFAULTS, HistorySettings, historySettings } from '../../utils/historySettings';
-import { prefs } from '../../utils/prefs';
 
 const SWITCH_BLUE = '#3478f6';
 const switchColors = {
@@ -21,27 +22,29 @@ const switchColors = {
   ...({ activeThumbColor: 'white', activeTrackColor: SWITCH_BLUE } as object),
 };
 
-const NOTIFICATION_DEFAULTS = { push: true, chat: true, request: true, trade: true, notice: true };
-type NotificationSettings = typeof NOTIFICATION_DEFAULTS;
-
-const NOTIFICATION_ITEMS: { key: Exclude<keyof NotificationSettings, 'push'>; label: string; sub: string }[] = [
-  { key: 'chat', label: '채팅 메시지', sub: '새 채팅 메시지가 오면 알려드려요' },
-  { key: 'request', label: '참여 요청', sub: '내 글에 참여 요청이 오거나 내 요청이 수락·거절되면' },
-  { key: 'trade', label: '모집 · 거래 상태', sub: '참여한 공동구매가 모집완료·거래완료되면' },
-  { key: 'notice', label: '기숙사 공지사항', sub: '새 공지사항이 올라오면' },
+// 서버 알림 설정 (카테고리별). 채팅방 하나만 끄는 건 채팅방 ••• 메뉴에서
+const NOTIFICATION_ITEMS: { key: keyof NotificationPreference; label: string; sub: string }[] = [
+  { key: 'chatEnabled', label: '채팅 메시지', sub: '새 채팅 메시지가 오면 알려드려요' },
+  { key: 'reservationEnabled', label: '참여 요청', sub: '내 글에 참여 요청이 오거나 내 요청이 수락·거절되면' },
+  { key: 'boardStatusEnabled', label: '모집 · 거래 상태', sub: '참여한 공동구매가 모집완료·거래완료되면' },
+  { key: 'dormNoticeEnabled', label: '기숙사 공지사항', sub: '새 공지사항이 올라오면' },
 ];
 
 export default function SettingsScreen(_: ScreenProps<'Settings'>) {
   const { me, logout, withdraw } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
-  const [noti, setNoti] = useState<NotificationSettings>(NOTIFICATION_DEFAULTS);
+  const [noti, setNoti] = useState<NotificationPreference | null>(null);
 
   const [record, setRecord] = useState<HistorySettings>(HISTORY_SETTINGS_DEFAULTS);
 
   useEffect(() => {
-    prefs.get('notifications', NOTIFICATION_DEFAULTS).then(setNoti);
+    notificationApi
+      .preference()
+      .then(setNoti)
+      .catch((e) => toast(errorMessage(e, '알림 설정을 불러오지 못했어요')));
     historySettings.get().then(setRecord);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateRecord = (patch: Partial<HistorySettings>) => {
@@ -50,10 +53,19 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
     historySettings.set(next).catch(() => toast('설정을 저장하지 못했어요'));
   };
 
-  const updateNoti = (patch: Partial<NotificationSettings>) => {
+  // PUT은 4개 값을 한 번에 보내야 함. 실패하면 이전 값으로 되돌림
+  const updateNoti = (patch: Partial<NotificationPreference>) => {
+    if (!noti) return;
+    const prev = noti;
     const next = { ...noti, ...patch };
     setNoti(next);
-    prefs.set('notifications', next).catch(() => toast('설정을 저장하지 못했어요'));
+    notificationApi
+      .updatePreference(next)
+      .then(setNoti)
+      .catch((e) => {
+        setNoti(prev);
+        toast(errorMessage(e, '설정을 저장하지 못했어요'));
+      });
   };
 
   const clearCache = async () => {
@@ -98,25 +110,13 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>알림</Text>
-          <View style={styles.item}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemText}>푸시 알림</Text>
-              <Text style={styles.itemSub}>끄면 모든 알림을 받지 않아요</Text>
-            </View>
-            <Switch value={noti.push} onValueChange={(v) => updateNoti({ push: v })} {...switchColors} />
-          </View>
           {NOTIFICATION_ITEMS.map((n, i) => (
-            <View key={n.key} style={[styles.item, i === NOTIFICATION_ITEMS.length - 1 && { borderBottomWidth: 0 }, !noti.push && { opacity: 0.45 }]}>
+            <View key={n.key} style={[styles.item, i === NOTIFICATION_ITEMS.length - 1 && { borderBottomWidth: 0 }]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.itemText}>{n.label}</Text>
                 <Text style={styles.itemSub}>{n.sub}</Text>
               </View>
-              <Switch
-                value={noti.push && noti[n.key]}
-                disabled={!noti.push}
-                onValueChange={(v) => updateNoti({ [n.key]: v })}
-                {...switchColors}
-              />
+              <Switch value={noti?.[n.key] ?? false} disabled={!noti} onValueChange={(v) => updateNoti({ [n.key]: v })} {...switchColors} />
             </View>
           ))}
         </View>

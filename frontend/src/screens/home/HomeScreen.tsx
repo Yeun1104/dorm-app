@@ -3,11 +3,12 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { boardApi } from '../../api/board';
 import { errorMessage } from '../../api/client';
+import { notificationApi } from '../../api/notification';
 import type { Board } from '../../api/types';
 import { ProductCard } from '../../components/BoardCard';
 import { useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { EmptyState, ErrorView, Fab, LoadingView, PageHeader, Screen } from '../../components/ui';
+import { CountBadge, EmptyState, ErrorView, Fab, LoadingView, PageHeader, Screen } from '../../components/ui';
 import { useLikeToggle } from '../../hooks/useLikeToggle';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
@@ -55,6 +56,14 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
   // 상세에서 참여/좋아요 후 돌아오면 게이지·대기인원이 바뀌어 있으니 첫 페이지를 조용히 갱신
   const loaded = useRef(false);
+  // 안 읽은 알림 수 (종 아이콘 배지) — 알림함에서 읽고 돌아오면 줄어들도록 포커스마다 갱신
+  const [unread, setUnread] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      notificationApi.unreadCount().then(setUnread).catch(() => {});
+    }, []),
+  );
+
   useFocusEffect(
     useCallback(() => {
       load(0, loaded.current ? 'silent' : 'initial');
@@ -87,6 +96,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             </Pressable>
             <Pressable style={styles.iconButton} onPress={() => navigation.navigate('Notifications')} accessibilityLabel="알림">
               <Icon name="bell" />
+              <CountBadge count={unread} style={{ top: -3, right: -3 }} />
             </Pressable>
           </View>
         }
