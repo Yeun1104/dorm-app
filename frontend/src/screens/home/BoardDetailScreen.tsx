@@ -8,6 +8,7 @@ import type { Board, Reservation } from '../../api/types';
 import { useMe } from '../../auth/AuthContext';
 import { boardProgress, BoardStatusChip } from '../../components/BoardCard';
 import { useConfirm, useToast } from '../../components/Feedback';
+import SaleCompleteSheet from '../../components/SaleCompleteSheet';
 import Icon from '../../components/Icon';
 import { Avatar, BottomSheet, Button, CountBadge, ErrorView, LoadingView, ProgressBar, Thumb } from '../../components/ui';
 import { invalidateBoard } from '../../hooks/useBoards';
@@ -48,6 +49,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [saleSheet, setSaleSheet] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
 
   const toggleLike = useLikeToggle((patch) => setData((d) => (d ? { ...d, board: { ...d.board, ...patch } } : d)));
@@ -135,9 +137,9 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
     bottom = (
       <View style={styles.ownerActions}>
         <Button
-          label={board.status === 'IN_PROGRESS' ? '모집완료' : '다시 모집'}
+          label={board.status === 'IN_PROGRESS' ? '판매완료' : '다시 모집'}
           variant="soft"
-          onPress={toggleBoardStatus}
+          onPress={board.status === 'IN_PROGRESS' ? () => setSaleSheet(true) : toggleBoardStatus}
           style={{ flex: 1 }}
         />
         <View style={{ flex: 2 }}>
@@ -307,6 +309,15 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
         </Pressable>
         {bottom}
       </View>
+
+      {mine && (
+        <SaleCompleteSheet
+          board={board}
+          visible={saleSheet}
+          onClose={() => setSaleSheet(false)}
+          onDone={(updated) => setData({ ...data, board: { ...board, ...updated } })}
+        />
+      )}
 
       <BottomSheet visible={sheet} onClose={() => setSheet(false)}>
         <Text style={styles.sheetTitle}>몇 개 참여할까요?</Text>

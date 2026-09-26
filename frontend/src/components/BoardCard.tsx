@@ -54,33 +54,18 @@ export function ProductCard({ board, onPress, onToggleLike }: { board: Board; on
   );
 }
 
-/**
- * 좋아요한 글 / 내가 쓴 글 카드 (.saved-card)
- * top을 주면 사진+글 위에 한 줄(상태 · 메뉴 등)을 두고, 제목 위 상태 칩은 생략
- */
-export function CompactBoardCard({ board, onPress, right, footer, top }: { board: Board; onPress: () => void; right?: ReactNode; footer?: ReactNode; top?: ReactNode }) {
-  const content = (
-    <>
+/** 좋아요한 글 / 내가 쓴 글 카드 (.saved-card) */
+export function CompactBoardCard({ board, onPress, right, footer }: { board: Board; onPress: () => void; right?: ReactNode; footer?: ReactNode }) {
+  return (
+    <Pressable style={styles.saved} onPress={onPress}>
       <Thumb uri={board.images[0]?.imageUrl} size={{ width: 83, height: 86 }} />
-      <View style={{ flex: 1, justifyContent: 'center', paddingRight: top ? 0 : 24 }}>
-        {!top && <BoardStatusChip status={board.status} />}
-        <Text style={[styles.savedTitle, !!top && { marginTop: 0 }]} numberOfLines={1}>{board.title}</Text>
+      <View style={{ flex: 1, justifyContent: 'center', paddingRight: 24 }}>
+        <BoardStatusChip status={board.status} />
+        <Text style={styles.savedTitle} numberOfLines={1}>{board.title}</Text>
         <Text style={styles.savedPrice}>{won(board.unitPrice)} / 개 · {board.remainingQuantity}개 남음</Text>
         {!!board.location && <Text style={styles.savedPlace} numberOfLines={1}>{placeName(board.location)}</Text>}
         {footer}
       </View>
-    </>
-  );
-  return (
-    <Pressable style={[styles.saved, !!top && styles.savedColumn]} onPress={onPress}>
-      {top ? (
-        <>
-          {top}
-          <View style={styles.savedRow}>{content}</View>
-        </>
-      ) : (
-        content
-      )}
       {right && <View style={styles.savedRight}>{right}</View>}
     </Pressable>
   );
@@ -105,8 +90,6 @@ const styles = StyleSheet.create({
   waitingText: { color: '#e2763f', fontSize: 10.5, fontWeight: '700' },
 
   saved: { flexDirection: 'row', gap: 12, padding: 12, marginBottom: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'white' },
-  savedColumn: { flexDirection: 'column', gap: 12, paddingHorizontal: 16, paddingTop: 15, paddingBottom: 16 },
-  savedRow: { flexDirection: 'row', gap: 12 },
   savedTitle: { marginTop: 5, marginBottom: 3, fontSize: font.md, fontWeight: '700', color: colors.text },
   savedPrice: { fontSize: font.sm, fontWeight: '700', color: colors.text },
   savedPlace: { marginTop: 3, color: '#8d9692', fontSize: font.xs },

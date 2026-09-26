@@ -6,13 +6,16 @@ import { errorMessage } from '../../api/client';
 import type { Board, BoardPage } from '../../api/types';
 import { userApi } from '../../api/user';
 import { CompactBoardCard } from '../../components/BoardCard';
+import SaleCompleteSheet from '../../components/SaleCompleteSheet';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import { EmptyState, ErrorView, Fab, LoadingView, Screen, SegmentedTabs, SubHeader } from '../../components/ui';
+import { EmptyState, ErrorView, Fab, LoadingView, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
 import { invalidateBoard } from '../../hooks/useBoards';
 import { useLikeToggle } from '../../hooks/useLikeToggle';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
+import { timeAgo, won } from '../../utils/format';
+import { placeName } from '../../utils/place';
 
 function usePagedBoards(fetchPage: (page: number) => Promise<BoardPage>) {
   const toast = useToast();
@@ -78,6 +81,7 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
   const [filter, setFilter] = useState<StatusFilter>('ALL');
   // ••• 누른 글과 말풍선 위치(누른 지점 바로 아래)
   const [menu, setMenu] = useState<{ board: Board; top: number } | null>(null);
+  const [saleBoard, setSaleBoard] = useState<Board | null>(null);
   const mine = mode === 'mine';
   const boards = mine && filter !== 'ALL' ? paged.boards.filter((b) => (filter === 'IN_PROGRESS' ? b.status === 'IN_PROGRESS' : b.status !== 'IN_PROGRESS')) : paged.boards;
 
@@ -144,40 +148,37 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
               title={mode === 'liked' ? '좋아요한 글이 없어요' : filter === 'IN_PROGRESS' ? '모집중인 글이 없어요' : filter === 'COMPLETED' ? '모집완료된 글이 없어요' : '아직 작성한 글이 없어요'}
             />
           }
-          renderItem={({ item }) => (
-            <CompactBoardCard
-              board={item}
-              onPress={() => navigation.navigate('BoardDetail', { boardId: item.id })}
-              top={
-                mine ? (
-                  <View style={styles.cardTop}>
-                    <Text style={[styles.status, item.status !== 'IN_PROGRESS' && styles.statusDone]}>{item.status === 'IN_PROGRESS' ? '모집중' : '모집완료'}</Text>
-                    <Pressable onPress={(e) => openMenu(item, e)} hitSlop={10} style={styles.more}>
-                      <Text style={styles.moreText}>•••</Text>
-                    </Pressable>
-                  </View>
-                ) : undefined
-              }
-              right={
-                mode === 'liked' ? (
+          renderItem={({ item }) =>
+            mine ? (
+              <MyPostCard
+                board={item}
+                onPress={() => navigation.navigate('BoardDetail', { boardId: item.id })}
+                onMenu={(e) => openMenu(item, e)}
+                onRequests={() => navigation.navigate('ReservationManage', { boardId: item.id })}
+                onSaleComplete={() => setSaleBoard(item)}
+              />
+            ) : (
+              <CompactBoardCard
+                board={item}
+                onPress={() => navigation.navigate('BoardDetail', { boardId: item.id })}
+                right={
                   <Pressable onPress={() => toggleLike(item)} hitSlop={8}>
                     <Icon name="heart" size={19} color={colors.heart} filled={item.liked} />
                   </Pressable>
-                ) : undefined
-              }
-              footer={
-                mode === 'mine' && item.status === 'IN_PROGRESS' && item.waitingCount > 0 ? (
-                  <Pressable style={styles.requestLink} onPress={() => navigation.navigate('ReservationManage', { boardId: item.id })}>
-                    <Text style={styles.requestLinkText}>요청 {item.waitingCount}건 보기</Text>
-                    <Icon name="chevron" size={13} color={colors.primaryDark} />
-                  </Pressable>
-                ) : undefined
-              }
-            />
-          )}
+                }
+              />
+            )
+          }
         />
       )}
       {mine && <Fab label="글쓰기" onPress={() => navigation.navigate('BoardWrite')} />}
+
+      <SaleCompleteSheet
+        board={saleBoard}
+        visible={!!saleBoard}
+        onClose={() => setSaleBoard(null)}
+        onDone={(updated) => paged.setBoards((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)))}
+      />
 
       <Modal transparent visible={!!menu} animationType="fade" onRequestClose={() => setMenu(null)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
@@ -198,6 +199,60 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
   );
 }
 
+/** 내가 쓴 글 카드: 상태 · 메뉴 / 사진 + 정보 / (모집중이면) 요청 보기 · 판매완료 */
+function MyPostCard({
+  board,
+  onPress,
+  onMenu,
+  onRequests,
+  onSaleComplete,
+}: {
+  board: Board;
+  onPress: () => void;
+  onMenu: (e: GestureResponderEvent) => void;
+  onRequests: () => void;
+  onSaleComplete: () => void;
+}) {
+  const recruiting = board.status === 'IN_PROGRESS';
+  const collected = board.totalQuantity - board.remainingQuantity;
+  return (
+    <Pressable style={styles.post} onPress={onPress}>
+      <View style={styles.cardTop}>
+        <Text style={[styles.status, !recruiting && styles.statusDone]}>{recruiting ? '모집중' : '모집완료'}</Text>
+        <Pressable onPress={onMenu} hitSlop={10} style={styles.more}>
+          <Text style={styles.moreText}>•••</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.postBody}>
+        <Thumb uri={board.images[0]?.imageUrl} size={92} radius={14} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.postTitle} numberOfLines={2}>{board.title}</Text>
+          <Text style={styles.postPrice}>
+            {won(board.unitPrice)}
+            <Text style={styles.postUnit}> / 개</Text>
+          </Text>
+          <Text style={styles.postMeta} numberOfLines={1}>
+            {collected}/{board.totalQuantity}개 모임 · {[placeName(board.location), timeAgo(board.createdAt)].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+      </View>
+
+      {recruiting && (
+        <View style={styles.postActions}>
+          <Pressable style={styles.postBtn} onPress={onRequests}>
+            <Text style={styles.postBtnText}>참여 요청{board.waitingCount > 0 ? ` ${board.waitingCount}` : ''}</Text>
+            {board.waitingCount > 0 && <View style={styles.dot} />}
+          </Pressable>
+          <Pressable style={[styles.postBtn, styles.postBtnDark]} onPress={onSaleComplete}>
+            <Text style={[styles.postBtnText, { color: 'white' }]}>판매완료</Text>
+          </Pressable>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 export function LikedBoardsScreen({ navigation }: ScreenProps<'LikedBoards'>) {
   return <BoardListScreen mode="liked" navigation={navigation} />;
 }
@@ -208,7 +263,18 @@ export function MyPostsScreen({ navigation }: ScreenProps<'MyPosts'>) {
 
 const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  status: { fontSize: font.sm, fontWeight: '800', color: colors.text },
+  post: { marginBottom: 12, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white' },
+  postBody: { marginTop: 12, flexDirection: 'row', gap: 14 },
+  postTitle: { fontSize: font.base, lineHeight: 21, fontWeight: '700', color: colors.text },
+  postPrice: { marginTop: 5, fontSize: 16, fontWeight: '800', color: colors.text },
+  postUnit: { fontSize: font.xs, fontWeight: '500', color: colors.textMuted },
+  postMeta: { marginTop: 5, fontSize: font.xs, color: colors.textMuted },
+  postActions: { marginTop: 14, flexDirection: 'row', gap: 8 },
+  postBtn: { flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 12, backgroundColor: '#f1f3f2' },
+  postBtnDark: { backgroundColor: colors.text },
+  postBtnText: { fontSize: font.sm, fontWeight: '700', color: colors.textBody },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.badge },
+  status: { fontSize: font.md, fontWeight: '800', color: colors.text },
   statusDone: { color: colors.textFaint },
   more: { paddingHorizontal: 4 },
   moreText: { color: colors.textMuted, fontWeight: '800', letterSpacing: 1 },
@@ -217,6 +283,4 @@ const styles = StyleSheet.create({
   bubbleItem: { paddingHorizontal: 16, paddingVertical: 11 },
   bubbleText: { fontSize: font.md, fontWeight: '600', color: colors.text },
   bubbleDivider: { height: 1, marginHorizontal: 10, backgroundColor: colors.borderLight },
-  requestLink: { alignSelf: 'flex-start', marginTop: 7, height: 26, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 8, backgroundColor: colors.primarySoft2 },
-  requestLinkText: { color: colors.primaryDark, fontSize: font.xs, fontWeight: '700' },
 });

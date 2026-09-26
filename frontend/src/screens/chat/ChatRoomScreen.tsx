@@ -16,6 +16,7 @@ import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { clockTime, parseServerDate, won } from '../../utils/format';
+import { isReviewed } from '../../utils/reviewed';
 import { isMyBoard } from '../home/BoardDetailScreen';
 
 export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatRoom'>) {
@@ -47,6 +48,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const [text, setText] = useState('');
   const [menu, setMenu] = useState(false);
   const [review, setReview] = useState(false);
+  const [reviewed, setReviewed] = useState(true);
 
   const loadPage = useCallback(
     async (p: number) => {
@@ -73,6 +75,13 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
 
   // 읽음 처리: 개별 메시지엔 id가 없어서 방의 lastMessageId 기준으로 처리.
   // 들어올 때(+포커스 복귀 시 방 정보 재조회됨) 한 번, 나갈 때 그 사이 받은 메시지까지 한 번 더.
+  // 거래완료된 방이면 내가 이미 매너 평가를 보냈는지 (기기 기록)
+  const completedReservationId = info.data?.reservation?.status === 'COMPLETED' ? info.data.reservation.id : null;
+  useEffect(() => {
+    if (completedReservationId == null) return;
+    isReviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(false));
+  }, [completedReservationId]);
+
   const lastMessageId = info.data?.room.lastMessageId;
   useEffect(() => {
     if (lastMessageId) chatApi.markRead(roomId, lastMessageId).catch(() => {});
@@ -159,12 +168,6 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         </Pressable>
       </View>
     );
-  } else if (reservation?.status === 'COMPLETED') {
-    dealActions = (
-      <Pressable style={styles.dealBtn} onPress={() => setReview(true)}>
-        <Text style={styles.dealBtnText}>매너 평가</Text>
-      </Pressable>
-    );
   }
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
@@ -235,6 +238,17 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         {dealActions}
       </Pressable>
 
+      {/* 거래완료되면 양쪽 모두에게 매너 평가 안내 */}
+      {reservation?.status === 'COMPLETED' && !reviewed && (
+        <Pressable style={styles.reviewBar} onPress={() => setReview(true)}>
+          <View style={styles.reviewIcon}>
+            <Icon name="star" size={15} color="white" />
+          </View>
+          <Text style={styles.reviewText}>거래가 완료됐어요! {other?.userName ?? '상대방'}님에게 매너 평가를 보내주세요</Text>
+          <Text style={styles.reviewAction}>보내기</Text>
+        </Pressable>
+      )}
+
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={insets.top}>
         <FlatList
           style={{ flex: 1, backgroundColor: colors.chatBg }}
@@ -287,6 +301,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
           reservationId={reservation.id}
           target={seller ? 'BUYER' : 'ORGANIZER'}
           targetName={other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '')}
+          onReviewed={() => setReviewed(true)}
         />
       )}
     </Screen>
@@ -307,6 +322,10 @@ const styles = StyleSheet.create({
   dealBtn: { height: 32, paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primaryLight, justifyContent: 'center' },
   dealBtnSoft: { backgroundColor: '#eef2f0' },
   dealBtnText: { color: 'white', fontSize: font.xs, fontWeight: '700' },
+  reviewBar: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, backgroundColor: '#fff8e3' },
+  reviewIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#f2b84b', alignItems: 'center', justifyContent: 'center' },
+  reviewText: { flex: 1, fontSize: font.xs, lineHeight: 16, fontWeight: '600', color: '#7a6128' },
+  reviewAction: { fontSize: font.sm, fontWeight: '800', color: '#7a6128' },
   divider: { textAlign: 'center', marginVertical: 12, color: '#8a9490', fontSize: font.xs },
   system: { alignSelf: 'center', marginBottom: 18, paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 16, backgroundColor: '#dcebed' },
   systemText: { color: '#668178', fontSize: font.xs },
