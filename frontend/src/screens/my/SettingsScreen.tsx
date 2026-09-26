@@ -1,71 +1,31 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { errorMessage } from '../../api/client';
-import { notificationApi } from '../../api/notification';
-import type { NotificationPreference } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
 import { Screen, SubHeader } from '../../components/ui';
 import { clearBoardCache } from '../../hooks/useBoards';
 import type { ScreenProps } from '../../navigation/types';
-import { colors, font } from '../../theme';
+import { colors } from '../../theme';
 import { HISTORY_SETTINGS_DEFAULTS, HistorySettings, historySettings } from '../../utils/historySettings';
+import { settingStyles as styles, switchColors } from './settingsShared';
 
-const SWITCH_BLUE = '#3478f6';
-const switchColors = {
-  trackColor: { true: SWITCH_BLUE, false: '#dfe3e6' },
-  thumbColor: 'white',
-  ios_backgroundColor: '#dfe3e6',
-  // react-native-web 전용 prop (타입엔 없음)
-  ...({ activeThumbColor: 'white', activeTrackColor: SWITCH_BLUE } as object),
-};
-
-// 서버 알림 설정 (카테고리별). 채팅방 하나만 끄는 건 채팅방 ••• 메뉴에서
-const NOTIFICATION_ITEMS: { key: keyof NotificationPreference; label: string; sub: string }[] = [
-  { key: 'chatEnabled', label: '채팅 메시지', sub: '새 채팅 메시지가 오면 알려드려요' },
-  { key: 'reservationEnabled', label: '참여 요청', sub: '내 글에 참여 요청이 오거나 내 요청이 수락·거절되면' },
-  { key: 'boardStatusEnabled', label: '모집 · 거래 상태', sub: '참여한 공동구매가 모집완료·거래완료되면' },
-  { key: 'dormNoticeEnabled', label: '기숙사 공지사항', sub: '새 공지사항이 올라오면' },
-];
-
-export default function SettingsScreen(_: ScreenProps<'Settings'>) {
+export default function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
   const { me, logout, withdraw } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
-  const [noti, setNoti] = useState<NotificationPreference | null>(null);
-
   const [record, setRecord] = useState<HistorySettings>(HISTORY_SETTINGS_DEFAULTS);
 
   useEffect(() => {
-    notificationApi
-      .preference()
-      .then(setNoti)
-      .catch((e) => toast(errorMessage(e, '알림 설정을 불러오지 못했어요')));
     historySettings.get().then(setRecord);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateRecord = (patch: Partial<HistorySettings>) => {
     const next = { ...record, ...patch };
     setRecord(next);
     historySettings.set(next).catch(() => toast('설정을 저장하지 못했어요'));
-  };
-
-  // PUT은 4개 값을 한 번에 보내야 함. 실패하면 이전 값으로 되돌림
-  const updateNoti = (patch: Partial<NotificationPreference>) => {
-    if (!noti) return;
-    const prev = noti;
-    const next = { ...noti, ...patch };
-    setNoti(next);
-    notificationApi
-      .updatePreference(next)
-      .then(setNoti)
-      .catch((e) => {
-        setNoti(prev);
-        toast(errorMessage(e, '설정을 저장하지 못했어요'));
-      });
   };
 
   const clearCache = async () => {
@@ -110,15 +70,13 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>알림</Text>
-          {NOTIFICATION_ITEMS.map((n, i) => (
-            <View key={n.key} style={[styles.item, i === NOTIFICATION_ITEMS.length - 1 && { borderBottomWidth: 0 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemText}>{n.label}</Text>
-                <Text style={styles.itemSub}>{n.sub}</Text>
-              </View>
-              <Switch value={noti?.[n.key] ?? false} disabled={!noti} onValueChange={(v) => updateNoti({ [n.key]: v })} {...switchColors} />
+          <Pressable style={[styles.item, { borderBottomWidth: 0 }]} onPress={() => navigation.navigate('NotificationSettings')}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemText}>알림 설정</Text>
+              <Text style={styles.itemSub}>채팅, 참여 요청, 거래 상태, 기숙사 공지</Text>
             </View>
-          ))}
+            <Icon name="chevron" size={17} color={colors.textMuted} />
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -172,12 +130,3 @@ export default function SettingsScreen(_: ScreenProps<'Settings'>) {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  section: { marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'white' },
-  sectionTitle: { paddingHorizontal: 15, paddingTop: 14, paddingBottom: 7, color: '#7f8a85', fontSize: font.xs, fontWeight: '700' },
-  item: { minHeight: 54, paddingHorizontal: 15, paddingVertical: 10, gap: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  itemText: { fontSize: font.base, color: colors.text },
-  itemSub: { marginTop: 2, fontSize: font.xs, color: colors.textMuted },
-  itemValue: { fontSize: font.sm, color: colors.textMuted },
-});
