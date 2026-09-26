@@ -38,11 +38,20 @@ public class ChatRoomUser extends BaseEntity {
     @Column(name = "last_read_message_id")
     private Long lastReadMessageId;
 
+    /** 이 채팅방만 콕 집어서 무음(알림 안 옴)으로 설정했는지. 기본은 false(알림 받음). */
+    @Column(name = "notification_muted", nullable = false)
+    @Builder.Default
+    private boolean notificationMuted = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
     public void updateLastReadMessage(Long messageId) {
         this.lastReadMessageId = messageId;
+    }
+
+    public void setNotificationMuted(boolean muted) {
+        this.notificationMuted = muted;
     }
 
     public void softDelete() {

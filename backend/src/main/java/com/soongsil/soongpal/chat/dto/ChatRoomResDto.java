@@ -6,11 +6,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -27,6 +29,7 @@ public class ChatRoomResDto {
     private Long lastMessageId;
     private LocalDateTime lastMessageTime;
     private Integer unreadCount; // 이 방에서 내가 안 읽은 메시지 개수 (뱃지용)
+    private boolean notificationMuted; // 이 방을 콕 집어서 무음으로 해뒀는지 (getChatRoom/getChatRoomsByUser에서만 채워짐)
 
     public static ChatRoomResDto of(ChatRoom chatRoom, String name, Long boardId, String productTitle,
                                      List<ChatRoomUserResDto> users, String lastMessage, LocalDateTime lastMessageTime) {

@@ -138,8 +138,10 @@ public class ChatRoomService {
 
         Integer unreadCount = calculateUnreadCount(roomId, userId);
 
-        return ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
+        ChatRoomResDto result = ChatRoomResDto.of(chatRoom, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
                 users, lastContent, lastMessageId, lastCreatedAt, unreadCount);
+        result.setNotificationMuted(isMuted(roomId, userId));
+        return result;
     }
 
     public List<ChatRoomResDto> getChatRoomsByUser(Long userId) {
@@ -212,8 +214,10 @@ public class ChatRoomService {
 
                             Integer unreadCount = calculateUnreadCount(c.getId(), userId);
 
-                            return ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
+                            ChatRoomResDto dto = ChatRoomResDto.of(c, findBoard.getTitle(), findBoard.getId(), findBoard.getTitle(),
                                     users, lastContent, lastMessageId, lastCreatedAt, unreadCount);
+                            dto.setNotificationMuted(isMuted(c.getId(), userId));
+                            return dto;
                         })
                 )
                 .flatMap(Optional::stream)
@@ -227,6 +231,19 @@ public class ChatRoomService {
                 .orElse(null);
         long sinceId = lastReadMessageId != null ? lastReadMessageId : 0L;
         return (int) chatMessageRepository.countByChatRoom_IdAndIdGreaterThanAndSender_IdNot(roomId, sinceId, userId);
+    }
+
+    private boolean isMuted(Long roomId, Long userId) {
+        return chatRoomUserRepository.findByChatRoomIdAndUserId(roomId, userId)
+                .map(ChatRoomUser::isNotificationMuted)
+                .orElse(false);
+    }
+
+    /** 이 채팅방만 콕 집어서 알림 켜기/끄기. */
+    public void setNotificationMuted(Long roomId, Long userId, boolean muted) {
+        ChatRoomUser roomUser = chatRoomUserRepository.findByChatRoomIdAndUserId(roomId, userId)
+                .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_NOT_JOINED));
+        roomUser.setNotificationMuted(muted);
     }
 
     public ChatRoomResDto joinChatRoom(Long boardId, Long userId) {

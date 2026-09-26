@@ -21,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 
 @Tag(name = "채팅방 API", description = "채팅방 관련 API")
@@ -125,6 +126,17 @@ public class ChatRoomController {
         Long userId = getUserId();
         chatRoomService.updateLastReadMessage(roomId, userId, messageId);
         return new ResponseEntity<>(new CommonResDto<>("읽음 처리되었습니다.", "성공"), HttpStatus.OK);
+    }
+
+    @Operation(summary = "채팅방 알림 켜기/끄기", description = "이 채팅방만 콕 집어서 알림을 무음으로 설정하거나 다시 켬. body: {\"muted\": true/false}")
+    @PatchMapping("/{roomId}/notification")
+    public ResponseEntity<CommonResDto<String>> setNotificationMuted(
+            @Parameter(description = "채팅방 ID") @PathVariable Long roomId,
+            @RequestBody Map<String, Boolean> body) {
+        Long userId = getUserId();
+        boolean muted = Boolean.TRUE.equals(body.get("muted"));
+        chatRoomService.setNotificationMuted(roomId, userId, muted);
+        return new ResponseEntity<>(new CommonResDto<>(muted ? "이 채팅방 알림을 껐습니다." : "이 채팅방 알림을 켰습니다.", "성공"), HttpStatus.OK);
     }
 
     private Long getUserId() {
