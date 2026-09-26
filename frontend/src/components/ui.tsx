@@ -192,11 +192,17 @@ export function Thumb({ uri, size, radius: r = 12, style }: { uri?: string | nul
 
 // ───────── 진행률 게이지 ─────────
 
-export function ProgressBar({ ratio, height = 10 }: { ratio: number; height?: number }) {
+/** label을 주면 게이지 안 가운데에 '12/30' 같은 글씨를 올림 (이때는 글씨가 들어가게 두껍게) */
+export function ProgressBar({ ratio, height = 10, label }: { ratio: number; height?: number; label?: string }) {
   const pct = Math.max(0, Math.min(1, ratio)) * 100;
   return (
     <View style={[s.progressTrack, { height }]}>
       <View style={[s.progressFill, { width: `${pct}%` }]} />
+      {!!label && (
+        <View style={s.progressLabelWrap} pointerEvents="none">
+          <Text style={[s.progressLabelText, { fontSize: Math.min(12, Math.round(height * 0.62)) }]}>{label}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -444,6 +450,8 @@ export const s = StyleSheet.create({
   avatarText: { color: colors.primaryDeep, fontWeight: '800' },
 
   progressTrack: { overflow: 'hidden', borderRadius: 10, backgroundColor: '#e8f1f3' },
+  progressLabelWrap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
+  progressLabelText: { fontWeight: '800', color: colors.primaryDeep },
   progressFill: { height: '100%', borderRadius: 10, backgroundColor: '#6bbccc' },
 
   segmented: { height: 48, paddingHorizontal: 18, flexDirection: 'row' },

@@ -38,14 +38,7 @@ export function ProductCard({ board, onPress, onToggleLike }: { board: Board; on
         </View>
         {/* 게이지는 카드 바닥에 맞춤 */}
         <View style={styles.progressWrap}>
-          <ProgressBar ratio={boardProgress(board)} height={8} />
-          <View style={styles.progressLabel}>
-            <Text style={styles.progressStrong}>
-              {collected}
-              <Text style={styles.progressMuted}>/{board.totalQuantity}개</Text>
-            </Text>
-            <Text style={styles.progressMuted}>{board.remainingQuantity > 0 ? `${board.remainingQuantity}개 남음` : '마감'}</Text>
-          </View>
+          <ProgressBar ratio={boardProgress(board)} height={18} label={`${collected}/${board.totalQuantity}`} />
           {board.waitingCount > 0 && (
             <View style={styles.waiting}>
               <Text style={styles.waitingText}>현재 {board.waitingCount}명 수락 대기중</Text>

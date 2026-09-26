@@ -240,18 +240,11 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
 
           <View style={styles.progressCard}>
             <View style={styles.progressHead}>
-              <Text style={styles.progressTitle}>
-                {collected}
-                <Text style={styles.participants}> / {board.totalQuantity}개</Text>
-              </Text>
+              <Text style={styles.progressTitle}>모집 현황</Text>
               <Text style={styles.progressPct}>{Math.round(progress * 100)}%</Text>
             </View>
-            <ProgressBar ratio={progress} />
-            <Text style={styles.progressHint}>
-              {[board.remainingQuantity > 0 ? `${board.remainingQuantity}개 남음` : '목표 수량 달성', board.participantCount > 0 && `${board.participantCount}명 참여`]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
+            <ProgressBar ratio={progress} height={24} label={`${collected} / ${board.totalQuantity}개`} />
+            {board.participantCount > 0 && <Text style={styles.progressHint}>{board.participantCount}명 참여 중</Text>}
             {board.waitingCount > 0 && <Text style={styles.waitingHint}>현재 {board.waitingCount}명 수락 대기중</Text>}
           </View>
 
@@ -392,7 +385,7 @@ const styles = StyleSheet.create({
   statValue: { fontSize: font.md, fontWeight: '700', color: colors.text },
   progressCard: { padding: 18, borderWidth: 1, borderColor: '#d8e8ed', borderRadius: 17 },
   progressHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  progressTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  progressTitle: { fontSize: font.base, fontWeight: '700', color: colors.text },
   participants: { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },
   progressPct: { fontSize: font.base, fontWeight: '700', color: colors.primaryDark },
   progressHint: { marginTop: 8, color: '#84908b', fontSize: font.xs },
