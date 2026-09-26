@@ -65,7 +65,7 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
         title={
           <>
             {item.title}
-            {inquiry && inquiry.replyCount > 0 && <Text style={styles.reply}> ({inquiry.replyCount})</Text>}
+            {inquiry && inquiry.replyCount > 0 && <Text style={styles.replyCount}> ({inquiry.replyCount})</Text>}
           </>
         }
         meta={`${item.writer} · 조회 ${item.viewCount}`}
@@ -275,6 +275,17 @@ export function InquiryDetailScreen({ navigation, route }: ScreenProps<'InquiryD
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.detail.title} meta={[data.detail.writer, `조회 ${data.detail.viewCount}`, data.detail.writtenAt]} />
           <Text style={detailStyles.body}>{data.detail.content}</Text>
+          {!!data.detail.staffReply && (
+            <View style={styles.reply}>
+              <View style={styles.replyHead}>
+                <View style={styles.replyIcon}>
+                  <Icon name="dorm" size={13} color="white" strokeWidth={2.2} />
+                </View>
+                <Text style={styles.replyTitle}>운영사무실 답변</Text>
+              </View>
+              <Text style={styles.replyText}>{data.detail.staffReply}</Text>
+            </View>
+          )}
           {data.mine && (
             <View style={detailStyles.actions}>
               <Button label="수정" variant="outline" onPress={() => navigation.navigate('InquiryForm', { no })} style={{ flex: 1, height: 46 }} />
@@ -429,7 +440,12 @@ function WriterInfo({ name, email }: { name: string; email: string }) {
 }
 
 const styles = StyleSheet.create({
-  reply: { color: colors.primaryDark, fontWeight: '700' },
+  reply: { marginBottom: 6, padding: 16, borderRadius: 16, backgroundColor: '#f3f6f5' },
+  replyHead: { marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  replyIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center' },
+  replyTitle: { fontSize: font.sm, fontWeight: '800', color: colors.text },
+  replyText: { fontSize: font.base, lineHeight: 23, color: colors.textBody },
+  replyCount: { color: colors.primaryDark, fontWeight: '700' },
   visit: { marginTop: 14, padding: 12, flexDirection: 'row', justifyContent: 'space-between', borderRadius: 11, backgroundColor: '#f5f7f6' },
   visitLabel: { fontSize: font.sm, color: '#78837f' },
   visitValue: { fontSize: font.sm, fontWeight: '700', color: colors.text },
