@@ -18,7 +18,8 @@ const BUYER_KEYWORDS = (Object.keys(MANNER_KEYWORDS) as MannerKeywordType[]).fil
 /**
  * 판매완료 (모집을 강제로 끝내기).
  * 1) 이 글로 채팅한 사람(수락/거래완료된 참여) 중 실제로 거래한 사람을 여러 명 고름
- *    → 고른 참여를 거래완료(COMPLETED)로 바꿔 서로의 거래 횟수에 반영하고, 게시글은 모집완료로
+ *    → 고른 참여는 거래완료(COMPLETED)로 바꿔 서로의 거래 횟수에 반영하고,
+ *      고르지 않은 수락 상태 참여는 거래취소(CANCELLED, 채팅방 읽기전용)로 정리한 뒤 게시글은 모집완료로
  * 2) 고른 사람들에게 한 번에 매너 평가 (건너뛰기 가능)
  * 인원이 다 차서 자동으로 모집완료된 경우와 구분하려고 버튼 이름은 '판매완료'
  */
@@ -64,6 +65,8 @@ export default function SaleCompleteSheet({
 
   if (!board) return null;
 
+  const unselectedCount = (people ?? []).filter((r) => r.status === 'ACCEPTED' && !selected.includes(r.id)).length;
+
   const toggle = (id: number) => setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const completeSale = async () => {
@@ -72,7 +75,12 @@ export default function SaleCompleteSheet({
       const targets = (people ?? []).filter((r) => selected.includes(r.id));
       const results = await Promise.allSettled(targets.map((r) => reservationApi.updateStatus(r.id, 'COMPLETED')));
       const done = targets.filter((_, i) => results[i].status === 'fulfilled');
-      const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+
+      // 채팅은 했지만 거래하지 않은 사람은 거래취소
+      const notTraded = (people ?? []).filter((r) => r.status === 'ACCEPTED' && !selected.includes(r.id));
+      const cancelResults = await Promise.allSettled(notTraded.map((r) => reservationApi.updateStatus(r.id, 'CANCELLED')));
+
+      const failed = [...results, ...cancelResults].find((r): r is PromiseRejectedResult => r.status === 'rejected');
       if (failed) toast(errorMessage(failed.reason));
 
       // 거래완료 처리 후에도 모집중이면 직접 마감
@@ -151,6 +159,7 @@ export default function SaleCompleteSheet({
             </ScrollView>
           )}
 
+          {unselectedCount > 0 && <Text style={styles.cancelNote}>선택하지 않은 {unselectedCount}명과의 거래는 취소되고 채팅이 종료돼요.</Text>}
           <Button label={selected.length ? `${selected.length}명과 판매완료` : '판매완료'} onPress={completeSale} loading={busy} disabled={people == null} style={{ marginTop: 14 }} />
         </>
       ) : (
@@ -182,6 +191,7 @@ const styles = StyleSheet.create({
   board: { marginTop: 16, marginBottom: 8, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, backgroundColor: '#f4f6f5' },
   boardTitle: { fontSize: font.md, fontWeight: '700', color: colors.text },
   boardSub: { marginTop: 2, fontSize: font.xs, color: colors.textMuted },
+  cancelNote: { marginTop: 12, fontSize: font.xs, lineHeight: 17, color: colors.warning },
   empty: { marginVertical: 26, textAlign: 'center', fontSize: font.sm, lineHeight: 20, color: colors.textMuted },
   person: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   name: { fontSize: font.base, fontWeight: '700', color: colors.text },
