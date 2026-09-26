@@ -54,7 +54,8 @@ public class MyPageService {
         Integer likeCount = likeRepository.countByBoardId(board.getId());
         Integer remaining = calculateRemainingQuantity(board);
         Integer waitingCount = (int) reservationRepository.countByBoardIdAndStatus(board.getId(), ReservationStatus.PENDING);
-        return BoardResDto.from(board, likeCount, liked, remaining, waitingCount);
+        Integer participantCount = reservationRepository.countDistinctParticipantsByBoardId(board.getId());
+        return BoardResDto.from(board, likeCount, liked, remaining, waitingCount, participantCount);
     }
 
     private Integer calculateRemainingQuantity(Board board) {

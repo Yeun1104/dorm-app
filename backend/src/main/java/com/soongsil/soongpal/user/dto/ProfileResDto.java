@@ -14,6 +14,8 @@ import java.util.List;
 public class ProfileResDto {
     private Long userId;
     private String nickname;
+    private boolean schoolVerified; // 학교 계정(usaint) 인증 여부 — 인증 배지 표시용
+    private boolean dormVerified;   // 기숙사 계정(ssudorm) 연동 여부 — 인증 배지 표시용
     private int tradeCount; // 구매자로서 완료 + 판매자(작성자)로서 완료한 거래 수 합
     private List<MannerBadgeDto> topMannerBadges; // 가장 많이 받은 매너 키워드 상위 3개 (label + 받은 횟수)
     private List<BoardSummaryDto> inProgressBoards; // 모집중인 글

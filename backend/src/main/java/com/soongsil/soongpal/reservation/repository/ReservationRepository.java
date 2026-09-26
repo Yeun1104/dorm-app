@@ -31,4 +31,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     /** 이 사용자가 게시글 작성자(판매자/총대)로서 COMPLETED한 거래 건수 (프로필 "거래횟수"용). */
     long countByBoard_UserIdAndStatus(Long userId, ReservationStatus status);
+
+    /** 이 게시글에 실제로 참여 확정된(수락됨+완료) 서로 다른 사람 수. 게시글 상세에 공개적으로 보여주는 참여인원용. */
+    @Query("select count(distinct r.buyer.id) from Reservation r " +
+            "where r.board.id = :boardId and r.status in ('ACCEPTED', 'COMPLETED')")
+    int countDistinctParticipantsByBoardId(@Param("boardId") Long boardId);
 }

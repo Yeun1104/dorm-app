@@ -56,6 +56,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
     }
 
+    @ExceptionHandler(NotificationException.class)
+    public ResponseEntity<CommonErrorDto> handleNotificationException(NotificationException e) {
+        log.error("[exceptionHandle] NotificationException", e);
+        return new ResponseEntity<>(new CommonErrorDto(e.getMessage()), e.getErrorCode().getHttpStatus());
+    }
+
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<CommonErrorDto> SecurityExceptionHandler (SecurityException e) {

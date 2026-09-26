@@ -7,6 +7,8 @@ import com.soongsil.soongpal.chat.dto.ChatRoomCreateReqDto;
 import com.soongsil.soongpal.chat.dto.ChatRoomResDto;
 import com.soongsil.soongpal.chat.service.ChatRoomService;
 import com.soongsil.soongpal.common.exception.*;
+import com.soongsil.soongpal.notification.domain.NotificationType;
+import com.soongsil.soongpal.notification.service.NotificationService;
 import com.soongsil.soongpal.report.domain.ReportCategory;
 import com.soongsil.soongpal.report.domain.ReportStatus;
 import com.soongsil.soongpal.report.repository.ReportRepository;
@@ -45,6 +47,7 @@ public class ReservationService {
     private final UserRepository userRepository;
     private final ChatRoomService chatRoomService;
     private final ReportRepository reportRepository;
+    private final NotificationService notificationService;
 
     /** API 1: 참여 요청 (구매자 → 방장). 이 시점엔 채팅방도 안 생기고 수량도 안 깎임. */
     @Transactional
@@ -85,6 +88,14 @@ public class ReservationService {
                 .quantity(dto.getQuantity())
                 .build();
         reservationRepository.save(reservation);
+
+        notificationService.notify(
+                board.getUser(),
+                NotificationType.RESERVATION_REQUESTED,
+                "새 참여 요청",
+                buyer.getNickName() + "님이 '" + board.getTitle() + "'에 참여를 요청했어요",
+                board.getId(), null, reservation.getId()
+        );
 
         return ReservationResDto.from(reservation);
     }
@@ -133,9 +144,35 @@ public class ReservationService {
                 ChatRoomResDto chatRoom = chatRoomService.createPrivateChatRoom(
                         new ChatRoomCreateReqDto(board.getId()), reservation.getBuyer().getId());
                 reservation.accept(chatRoom.getId());
+
+                notificationService.notify(
+                        reservation.getBuyer(),
+                        NotificationType.RESERVATION_ACCEPTED,
+                        "참여 요청 수락됨",
+                        "'" + board.getTitle() + "' 참여 요청이 수락됐어요! 채팅으로 이동해보세요",
+                        board.getId(), chatRoom.getId(), reservation.getId()
+                );
             }
-            case REJECTED -> reservation.reject();
-            case COMPLETED -> reservation.markCompleted();
+            case REJECTED -> {
+                reservation.reject();
+                notificationService.notify(
+                        reservation.getBuyer(),
+                        NotificationType.RESERVATION_REJECTED,
+                        "참여 요청 거절됨",
+                        "'" + board.getTitle() + "' 참여 요청이 거절됐어요",
+                        board.getId(), null, reservation.getId()
+                );
+            }
+            case COMPLETED -> {
+                reservation.markCompleted();
+                notificationService.notify(
+                        reservation.getBuyer(),
+                        NotificationType.RESERVATION_COMPLETED,
+                        "거래 완료",
+                        "'" + board.getTitle() + "' 거래가 완료됐어요. 매너 평가를 남겨보세요!",
+                        board.getId(), reservation.getChatRoomId(), reservation.getId()
+                );
+            }
             case CANCELLED -> reservation.cancel();
             default -> throw new ReservationException(ReservationErrorCode.RESERVATION_INVALID_STATUS_TRANSITION);
         }
@@ -210,6 +247,18 @@ public class ReservationService {
         int remaining = board.getTotalQuantity() - held;
         if (remaining <= 0 && board.getStatus() == BoardStatus.IN_PROGRESS) {
             board.updateStatus(BoardStatus.COMPLETED);
+
+            // 모집완료(품절) 시, 이 글에 실제로 참여 확정된(ACCEPTED) 사람들 전원에게 알림
+            List<Reservation> acceptedReservations = reservationRepository.findByBoardIdAndStatus(board.getId(), ReservationStatus.ACCEPTED);
+            for (Reservation r : acceptedReservations) {
+                notificationService.notify(
+                        r.getBuyer(),
+                        NotificationType.BOARD_SOLD_OUT,
+                        "모집 완료",
+                        "참여하신 '" + board.getTitle() + "' 공동구매가 모집완료됐어요",
+                        board.getId(), null, r.getId()
+                );
+            }
         }
     }
 }

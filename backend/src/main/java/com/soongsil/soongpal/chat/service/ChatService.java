@@ -14,6 +14,7 @@ import com.soongsil.soongpal.chat.repository.ChatRoomUserRepository;
 import com.soongsil.soongpal.common.exception.ChatException;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
+import com.soongsil.soongpal.notification.service.NotificationService;
 import com.soongsil.soongpal.user.domain.User;
 import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class ChatService {
     private final ChatRoomUserRepository chatRoomUserRepository;
     private final UserRepository userRepository;
     private final FCMNotificationService fcmNotificationService;
+    private final NotificationService notificationService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -84,7 +86,18 @@ public class ChatService {
         List<ChatRoomUser> otherUsers = chatRoomUserRepository.findByChatRoomIdAndUserIdNot(roomId, senderId);
 
         for (ChatRoomUser chatRoomUser : otherUsers) {
+            // 이 방을 콕 집어서 무음으로 해뒀으면 스킵
+            if (chatRoomUser.isNotificationMuted()) {
+                continue;
+            }
+
             User user = chatRoomUser.getUser();
+
+            // 채팅 알림 카테고리 자체를 꺼둔 사람도 스킵
+            if (!notificationService.isChatEnabled(user.getId())) {
+                continue;
+            }
+
             if (user.getDeviceTokens() != null && !user.getDeviceTokens().isEmpty() && user.getDeletedAt() == null) {
                 for (DeviceToken token : user.getDeviceTokens()) {
                     if (token.isNotificationEnabled()) {
