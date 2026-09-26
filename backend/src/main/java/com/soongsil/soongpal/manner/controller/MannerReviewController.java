@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -42,6 +43,14 @@ public class MannerReviewController {
         Long userId = getUserId();
         MannerReviewResDto result = mannerReviewService.createReview(userId, reservationId, dto);
         return new ResponseEntity<>(new CommonResDto<>("매너 평가가 등록되었습니다.", result), HttpStatus.OK);
+    }
+
+    @Operation(summary = "매너 평가 완료 여부 조회", description = "이 예약에 대해 내가 이미 평가를 남겼는지. 기기별이 아니라 서버 기준이라 다른 기기에서도 정확함.")
+    @GetMapping("/api/reservations/{reservationId}/manner-review/status")
+    public ResponseEntity<CommonResDto<Map<String, Boolean>>> getReviewStatus(@PathVariable Long reservationId) {
+        Long userId = getUserId();
+        boolean reviewed = mannerReviewService.hasReviewed(reservationId, userId);
+        return new ResponseEntity<>(new CommonResDto<>("매너 평가 여부 조회 성공", Map.of("reviewed", reviewed)), HttpStatus.OK);
     }
 
     private Long getUserId() {

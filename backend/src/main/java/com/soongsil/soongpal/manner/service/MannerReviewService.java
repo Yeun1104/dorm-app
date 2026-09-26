@@ -104,4 +104,12 @@ public class MannerReviewService {
                 .map(entry -> new MannerBadgeDto(entry.getKey().getLabel(), entry.getValue()))
                 .toList();
     }
+
+    /**
+     * 이 예약에 대해 "나"(reviewerId)가 이미 매너 평가를 남겼는지 여부.
+     * 프론트가 기기에만 평가여부를 저장해서 다른 기기 로그인 시 안내줄이 다시 뜨는 문제 때문에 필요해짐.
+     */
+    public boolean hasReviewed(Long reservationId, Long reviewerId) {
+        return mannerReviewRepository.existsByReservationIdAndReviewerId(reservationId, reviewerId);
+    }
 }
