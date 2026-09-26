@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   ipsaDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   ipsaDateLabel: { width: 52, fontSize: font.sm, color: colors.textMuted },
   ipsaDateValue: { fontSize: font.sm, fontWeight: '700', color: colors.primaryDeep },
-  ipsaAmount: { marginTop: 16, paddingTop: 14, flexDirection: 'row', alignItems: 'baseline', gap: 8, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  ipsaAmount: { marginTop: 16, paddingTop: 14, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, borderTopWidth: 1, borderTopColor: colors.borderLight },
   ipsaAmountLabel: { fontSize: font.md, color: colors.textMuted },
   ipsaAmountValue: { fontSize: 18, fontWeight: '800', color: colors.text },
   ipsaSectionTitle: { marginBottom: 8, marginLeft: 4, fontSize: font.md, fontWeight: '800', color: colors.text },
