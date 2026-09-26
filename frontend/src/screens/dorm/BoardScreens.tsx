@@ -21,9 +21,10 @@ import {
   SubHeader,
 } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
+import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
-import { BoardRow, DetailHeader, detailStyles, PAGE_SIZE, Pager } from './dormShared';
+import { BoardRow, DetailHeader, detailStyles, DORM_SERVER_PAGE_SIZE, DORM_UI_PAGE_SIZE, Pager } from './dormShared';
 
 type Kind = 'repair' | 'notice' | 'inquiry';
 type Item = RepairListItem | NoticeListItem | InquiryListItem;
@@ -57,14 +58,15 @@ const formatReply = (text: string) =>
 function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: number) => void; onWrite?: () => void }) {
   const [field, setField] = useState<DormSearchField>('TITLE');
   const [keyword, setKeyword] = useState('');
-  const [query, setQuery] = useState({ keyword: '', field: 'TITLE' as DormSearchField, page: 0 });
-  const { data, error, loading, refreshing, reload, refresh } = useFetch(
-    () => listFn[kind](query) as Promise<Item[]>,
+  const [query, setQuery] = useState({ keyword: '', field: 'TITLE' as DormSearchField });
+  const list = useSlicedPages(
+    (page) => listFn[kind]({ ...query, page }) as Promise<Item[]>,
+    DORM_SERVER_PAGE_SIZE,
+    DORM_UI_PAGE_SIZE,
     [kind, query],
-    { refetchOnFocus: true },
   );
 
-  const search = () => setQuery({ keyword, field, page: 0 });
+  const search = () => setQuery({ keyword, field });
 
   const renderItem = ({ item }: { item: Item }) => {
     const inquiry = kind === 'inquiry' ? (item as InquiryListItem) : null;
@@ -92,21 +94,21 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
       <View style={styles.searchWrap}>
         <BoardSearchBar field={field} onFieldChange={setField} keyword={keyword} onKeywordChange={setKeyword} onSubmit={search} />
       </View>
-      {loading && !data ? (
+      {list.loading && !list.items ? (
         <LoadingView />
-      ) : error && !data ? (
-        <ErrorView message={error} onRetry={reload} />
+      ) : list.error && !list.items ? (
+        <ErrorView message={list.error} onRetry={list.reload} />
       ) : (
         <FlatList
-          data={data ?? []}
+          data={list.items ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
           contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.refresh} tintColor={colors.primary} />}
           ListEmptyComponent={<EmptyState icon="doc" title={query.keyword ? '검색 결과가 없어요' : META[kind].empty} />}
           ListFooterComponent={
-            <Pager page={query.page} hasNext={(data?.length ?? 0) >= PAGE_SIZE} loading={loading} onChange={(page) => setQuery((q) => ({ ...q, page }))} />
+            <Pager page={list.page} hasNext={list.hasNext} loading={list.loading} onChange={list.goTo} />
           }
         />
       )}

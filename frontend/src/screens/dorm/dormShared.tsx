@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import Icon from '../../components/Icon';
 import { ChipTone } from '../../components/ui';
 import { colors, font } from '../../theme';
 
@@ -51,23 +52,40 @@ export function BoardRow({
   );
 }
 
-/** 페이지네이션 (10개씩) — 서버가 전체 개수를 안 주므로 받은 개수가 10개면 다음 페이지가 있다고 봄 */
+/**
+ * 페이지네이션: ‹  1  2 (3)  4  › — 서버가 전체 개수를 안 줘서, 지나온 페이지와 다음 한 페이지까지만 번호로 보여줌
+ */
 export function Pager({ page, hasNext, loading, onChange }: { page: number; hasNext: boolean; loading?: boolean; onChange: (p: number) => void }) {
   if (page === 0 && !hasNext) return null;
+  const last = hasNext ? page + 1 : page;
+  const from = Math.max(0, last - 4); // 번호는 최대 5개
+  const pages = Array.from({ length: last - from + 1 }, (_, i) => from + i);
   return (
     <View style={styles.pager}>
-      <Pressable style={[styles.pagerBtn, page === 0 && styles.pagerDisabled]} disabled={page === 0 || loading} onPress={() => onChange(page - 1)}>
-        <Text style={styles.pagerText}>이전</Text>
+      <Pressable style={[styles.pagerArrow, page === 0 && styles.pagerDisabled]} disabled={page === 0 || loading} onPress={() => onChange(page - 1)} hitSlop={6} accessibilityLabel="이전 페이지">
+        <Icon name="back" size={16} color={colors.text} />
       </Pressable>
-      {loading ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.pagerPage}>{page + 1}</Text>}
-      <Pressable style={[styles.pagerBtn, !hasNext && styles.pagerDisabled]} disabled={!hasNext || loading} onPress={() => onChange(page + 1)}>
-        <Text style={styles.pagerText}>다음</Text>
+      {pages.map((p) => {
+        const active = p === page;
+        return (
+          <Pressable key={p} style={[styles.pagerNum, active && styles.pagerNumActive]} disabled={active || loading} onPress={() => onChange(p)}>
+            {active && loading ? <ActivityIndicator size="small" color="white" /> : <Text style={[styles.pagerNumText, active && styles.pagerNumTextActive]}>{p + 1}</Text>}
+          </Pressable>
+        );
+      })}
+      <Pressable style={[styles.pagerArrow, !hasNext && styles.pagerDisabled]} disabled={!hasNext || loading} onPress={() => onChange(page + 1)} hitSlop={6} accessibilityLabel="다음 페이지">
+        <Icon name="chevron" size={16} color={colors.text} />
       </Pressable>
     </View>
   );
 }
 
+/** 외박/장기비움 목록처럼 서버 페이지를 그대로 쓰는 곳의 페이지 크기 */
 export const PAGE_SIZE = 10;
+
+/** 게시판(고쳐주세요/공지/일반문의): 사이트는 15개씩 주지만 폰 한 화면에 들어오게 8개씩 보여줌 */
+export const DORM_SERVER_PAGE_SIZE = 15;
+export const DORM_UI_PAGE_SIZE = 8;
 
 /** 상세 화면 공통 레이아웃 (제목 / 메타 / 본문) */
 export function DetailHeader({ title, meta }: { title: string; meta: string[] }) {
@@ -85,18 +103,21 @@ export const detailStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  row: { minHeight: 70, paddingVertical: 13, flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e1e8ea' },
-  no: { minWidth: 48, paddingTop: 1, textAlign: 'center', color: colors.textFaint, fontSize: font.xs },
+  // 번호 · 제목/작성자 · 날짜를 세로 가운데로 맞춤
+  row: { minHeight: 62, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e1e8ea' },
+  no: { minWidth: 48, textAlign: 'center', color: colors.textFaint, fontSize: font.xs },
   title: { flexShrink: 1, fontSize: font.base, fontWeight: '600', color: colors.text },
-  meta: { marginTop: 5, color: '#909ca1', fontSize: font.xs },
-  date: { color: '#97a2a6', fontSize: font.xs, paddingTop: 1 },
+  meta: { marginTop: 4, color: '#909ca1', fontSize: font.xs },
+  date: { color: '#97a2a6', fontSize: font.xs },
   newBadge: { width: 15, height: 15, borderRadius: 8, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center' },
   newText: { color: 'white', fontSize: 9, fontWeight: '800' },
-  pager: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 },
-  pagerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#dfe5e2', backgroundColor: 'white' },
-  pagerDisabled: { opacity: 0.4 },
-  pagerText: { fontSize: font.sm, color: colors.textBody },
-  pagerPage: { fontSize: font.base, fontWeight: '700', color: colors.primaryDark },
+  pager: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  pagerArrow: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  pagerDisabled: { opacity: 0.25 },
+  pagerNum: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  pagerNumActive: { backgroundColor: colors.text },
+  pagerNumText: { fontSize: font.md, fontWeight: '600', color: colors.textMuted },
+  pagerNumTextActive: { color: 'white', fontWeight: '800' },
   detailHead: { paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   detailTitle: { fontSize: 19, fontWeight: '800', color: colors.text, lineHeight: 26 },
   detailMeta: { marginTop: 7, color: colors.textMuted, fontSize: font.xs },
