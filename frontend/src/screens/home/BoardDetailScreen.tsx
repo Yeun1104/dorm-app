@@ -278,27 +278,39 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
           <Pressable style={styles.roundBtn} onPress={() => toast('공유 기능은 준비 중이에요')}>
             <Icon name="share" color="white" />
           </Pressable>
-          {mine && (
-            <Pressable style={styles.roundBtn} onPress={() => setMenu((v) => !v)}>
-              <Text style={{ color: 'white', fontWeight: '800', letterSpacing: 1 }}>•••</Text>
-            </Pressable>
-          )}
+          <Pressable style={styles.roundBtn} onPress={() => setMenu((v) => !v)} accessibilityLabel="더보기">
+            <Text style={{ color: 'white', fontWeight: '800', letterSpacing: 1 }}>•••</Text>
+          </Pressable>
         </View>
       </View>
       {menu && (
         <View style={[styles.menu, { top: insets.top + 58 }]}>
-          <Pressable
-            style={styles.menuItem}
-            onPress={() => {
-              setMenu(false);
-              navigation.navigate('BoardWrite', { boardId });
-            }}
-          >
-            <Text style={{ color: colors.text, fontSize: font.md }}>게시글 수정</Text>
-          </Pressable>
-          <Pressable style={styles.menuItem} onPress={deleteBoard}>
-            <Text style={{ color: colors.danger, fontSize: font.md }}>게시글 삭제</Text>
-          </Pressable>
+          {mine ? (
+            <>
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenu(false);
+                  navigation.navigate('BoardWrite', { boardId });
+                }}
+              >
+                <Text style={{ color: colors.text, fontSize: font.md }}>게시글 수정</Text>
+              </Pressable>
+              <Pressable style={styles.menuItem} onPress={deleteBoard}>
+                <Text style={{ color: colors.danger, fontSize: font.md }}>게시글 삭제</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setMenu(false);
+                navigation.navigate('Report', { userId: board.authorId, nickname: board.authorNickname, boardId });
+              }}
+            >
+              <Text style={{ color: colors.danger, fontSize: font.md }}>신고하기</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
