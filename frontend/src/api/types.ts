@@ -192,6 +192,10 @@ export interface Profile {
   nickname: string;
   tradeCount: number;
   topMannerBadges: MannerBadge[];
+  /** 기숙사 계정 연동(인증) 여부 — TODO: 백엔드 ProfileResDto에 아직 없음. 오면 배지 표시 */
+  dormVerified?: boolean;
+  /** 학교(u-saint) 인증 여부 — TODO: 백엔드 User.schoolVerified를 ProfileResDto로 내려줘야 함 */
+  schoolVerified?: boolean;
   inProgressBoards: BoardSummary[];
   completedBoards: BoardSummary[];
 }

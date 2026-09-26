@@ -202,7 +202,7 @@ export default function BoardWriteScreen({ navigation, route }: ScreenProps<'Boa
       <BottomSheet visible={buildingSheet} onClose={() => setBuildingSheet(false)}>
         <Text style={styles.sheetTitle}>건물 선택</Text>
         <View style={{ marginBottom: 8 }}>
-          <SearchBox value={buildingQuery} onChangeText={setBuildingQuery} placeholder="건물 이름 검색 (초성도 돼요)" />
+          <SearchBox value={buildingQuery} onChangeText={setBuildingQuery} />
         </View>
         <ScrollView style={{ height: 360 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {hangulFilter(CAMPUS_BUILDINGS, buildingQuery).length === 0 && <Text style={styles.buildingEmpty}>검색 결과가 없어요</Text>}

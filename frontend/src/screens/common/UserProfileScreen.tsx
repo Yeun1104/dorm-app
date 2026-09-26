@@ -113,6 +113,12 @@ function ProfileBody({ profile, onBoard, onEditNickname }: { profile: Profile; o
           <Text style={styles.name}>{profile.nickname}</Text>
         )}
         <Text style={styles.sub}>거래 {profile.tradeCount}회</Text>
+        {(profile.dormVerified || profile.schoolVerified) && (
+          <View style={styles.verifyRow}>
+            {profile.schoolVerified && <VerifyBadge icon="shield" label="숭실대 인증" tone="blue" />}
+            {profile.dormVerified && <VerifyBadge icon="dorm" label="기숙사생" tone="mint" />}
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -139,6 +145,24 @@ function ProfileBody({ profile, onBoard, onEditNickname }: { profile: Profile; o
   );
 }
 
+const VERIFY_TONES = {
+  blue: { fg: '#3478f6', bg: '#edf3ff' },
+  mint: { fg: colors.primaryDark, bg: colors.primarySoft2 },
+};
+
+/** 인증 배지: 색 동그라미 아이콘 + 짧은 라벨 */
+function VerifyBadge({ icon, label, tone }: { icon: 'shield' | 'dorm'; label: string; tone: keyof typeof VERIFY_TONES }) {
+  const t = VERIFY_TONES[tone];
+  return (
+    <View style={[styles.verify, { backgroundColor: t.bg }]}>
+      <View style={[styles.verifyIcon, { backgroundColor: t.fg }]}>
+        <Icon name={icon} size={11} color="white" strokeWidth={2.2} />
+      </View>
+      <Text style={[styles.verifyText, { color: t.fg }]}>{label}</Text>
+    </View>
+  );
+}
+
 function SummaryRow({ board, onPress }: { board: BoardSummary; onPress: () => void }) {
   return (
     <Pressable style={styles.row} onPress={onPress}>
@@ -161,6 +185,10 @@ const styles = StyleSheet.create({
   nameRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   editBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#eef1f0', alignItems: 'center', justifyContent: 'center' },
   sub: { marginTop: 3, color: '#829097', fontSize: font.sm },
+  verifyRow: { marginTop: 12, flexDirection: 'row', gap: 6 },
+  verify: { height: 26, paddingLeft: 4, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 13 },
+  verifyIcon: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  verifyText: { fontSize: font.xs, fontWeight: '700' },
   section: { marginTop: 12, padding: 15, borderWidth: 1, borderColor: '#e1e8ea', borderRadius: 15, backgroundColor: 'white' },
   sectionTitle: { marginBottom: 11, fontSize: font.md, fontWeight: '700', color: colors.text },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

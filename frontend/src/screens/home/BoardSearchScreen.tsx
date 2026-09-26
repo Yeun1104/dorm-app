@@ -25,7 +25,7 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 const HISTORY_KEY = 'recentSearches';
-const HISTORY_MAX = 10;
+const HISTORY_MAX = 8;
 
 /** 이만큼 내려가면 '맨 위로' 버튼 노출 */
 const SCROLL_TOP_FROM = 400;
@@ -51,7 +51,7 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
   const [recordSettings, setRecordSettings] = useState<HistorySettings>(HISTORY_SETTINGS_DEFAULTS);
 
   useEffect(() => {
-    prefs.get<string[]>(HISTORY_KEY, []).then(setHistory);
+    prefs.get<string[]>(HISTORY_KEY, []).then((h) => setHistory(h.slice(0, HISTORY_MAX)));
   }, []);
 
   // 상세/설정에서 돌아오면 최근 본 글·기록 설정이 바뀌어 있을 수 있으니 포커스마다 다시 읽음
@@ -153,11 +153,20 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 20 }}>
         <View style={styles.historyHead}>
           <Text style={styles.historyTitle}>최근 검색</Text>
-          {recordSettings.search && history.length > 0 && (
-            <Pressable onPress={() => saveHistory([])} hitSlop={8}>
-              <Text style={styles.historyClear}>전체 삭제</Text>
+          {/* 기록 설정 · 전체 삭제를 제목 줄 오른쪽에 나란히 */}
+          <View style={styles.historyActions}>
+            <Pressable onPress={() => navigation.navigate('Settings')} hitSlop={8}>
+              <Text style={styles.historyClear}>{recordSettings.search || recordSettings.viewed ? '기록 끄기' : '기록 켜기'}</Text>
             </Pressable>
-          )}
+            {recordSettings.search && history.length > 0 && (
+              <>
+                <View style={styles.actionDivider} />
+                <Pressable onPress={() => saveHistory([])} hitSlop={8}>
+                  <Text style={styles.historyClear}>전체 삭제</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
         </View>
         {!recordSettings.search ? (
           <Text style={styles.historyEmpty}>최근 검색 기록 저장이 꺼져 있어요</Text>
@@ -201,9 +210,6 @@ export default function BoardSearchScreen({ navigation }: ScreenProps<'BoardSear
           </>
         )}
 
-        <Pressable style={styles.recordLink} onPress={() => navigation.navigate('Settings')} hitSlop={8}>
-          <Text style={styles.recordLinkText}>{recordSettings.search || recordSettings.viewed ? '기록 끄기' : '기록 설정'}</Text>
-        </Pressable>
       </ScrollView>
     );
   else if (loading && boards.length === 0) body = <LoadingView />;
@@ -283,8 +289,8 @@ const styles = StyleSheet.create({
   historyRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   recentCard: { width: 116 },
   recentRemove: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(22,29,27,0.55)', alignItems: 'center', justifyContent: 'center' },
-  recordLink: { marginTop: 'auto', paddingTop: 24, alignSelf: 'flex-end' },
-  recordLinkText: { fontSize: font.xs, color: colors.textMuted, textDecorationLine: 'underline' },
+  historyActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  actionDivider: { width: 1, height: 11, backgroundColor: '#d9dedc' },
   recentTitle: { marginTop: 7, fontSize: font.sm, fontWeight: '600', color: colors.text },
   recentPrice: { marginTop: 2, fontSize: font.sm, fontWeight: '800', color: colors.text },
   recentDone: { fontSize: font.xs, fontWeight: '600', color: colors.textFaint },
