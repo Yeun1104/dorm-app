@@ -39,6 +39,7 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
         }
       />
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 35 }}
         refreshControl={
           <RefreshControl

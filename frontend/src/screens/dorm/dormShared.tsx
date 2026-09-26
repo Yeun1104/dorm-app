@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Icon from '../../components/Icon';
 import { ChipTone } from '../../components/ui';
+import { PAGE_BLOCK } from '../../hooks/useSlicedPages';
 import { colors, font } from '../../theme';
 
 /** 기숙사 사이트 상태 문자열(승인/대기/반려/처리중/완료…) → 칩 색 */
@@ -51,23 +53,65 @@ export function BoardRow({
   );
 }
 
-/** 페이지네이션 (10개씩) — 서버가 전체 개수를 안 주므로 받은 개수가 10개면 다음 페이지가 있다고 봄 */
-export function Pager({ page, hasNext, loading, onChange }: { page: number; hasNext: boolean; loading?: boolean; onChange: (p: number) => void }) {
-  if (page === 0 && !hasNext) return null;
+/**
+ * 페이지네이션: <  1  2  3  4  5  >
+ * 번호는 5개씩 묶어서 보여주고, 현재 페이지는 굵은 강조색 글씨. < > 는 이전/다음 묶음으로 이동
+ * (사이트가 전체 개수를 안 줘서 번호 개수는 useSlicedPages가 묶음 단위로 파악한 값)
+ */
+export function Pager({
+  page,
+  pagesInBlock,
+  hasNextBlock,
+  loading,
+  onChange,
+}: {
+  page: number;
+  pagesInBlock: number;
+  hasNextBlock: boolean;
+  loading?: boolean;
+  onChange: (p: number) => void;
+}) {
+  const blockStart = Math.floor(page / PAGE_BLOCK) * PAGE_BLOCK;
+  const hasPrevBlock = blockStart > 0;
+  if (!hasPrevBlock && !hasNextBlock && pagesInBlock <= 1) return null;
   return (
     <View style={styles.pager}>
-      <Pressable style={[styles.pagerBtn, page === 0 && styles.pagerDisabled]} disabled={page === 0 || loading} onPress={() => onChange(page - 1)}>
-        <Text style={styles.pagerText}>이전</Text>
+      <Pressable
+        style={[styles.pagerArrow, !hasPrevBlock && styles.pagerDisabled]}
+        disabled={!hasPrevBlock || loading}
+        onPress={() => onChange(blockStart - 1)}
+        hitSlop={6}
+        accessibilityLabel="이전 페이지 묶음"
+      >
+        <Icon name="back" size={17} color={colors.text} />
       </Pressable>
-      {loading ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.pagerPage}>{page + 1}</Text>}
-      <Pressable style={[styles.pagerBtn, !hasNext && styles.pagerDisabled]} disabled={!hasNext || loading} onPress={() => onChange(page + 1)}>
-        <Text style={styles.pagerText}>다음</Text>
+      {Array.from({ length: pagesInBlock }, (_, i) => blockStart + i).map((p) => {
+        const active = p === page;
+        return (
+          <Pressable key={p} style={styles.pagerNum} disabled={active || loading} onPress={() => onChange(p)} hitSlop={4}>
+            <Text style={[styles.pagerNumText, active && styles.pagerNumTextActive]}>{p + 1}</Text>
+          </Pressable>
+        );
+      })}
+      <Pressable
+        style={[styles.pagerArrow, !hasNextBlock && styles.pagerDisabled]}
+        disabled={!hasNextBlock || loading}
+        onPress={() => onChange(blockStart + PAGE_BLOCK)}
+        hitSlop={6}
+        accessibilityLabel="다음 페이지 묶음"
+      >
+        <Icon name="chevron" size={17} color={colors.text} />
       </Pressable>
     </View>
   );
 }
 
-export const PAGE_SIZE = 10;
+/** 외박/장기비움 목록: 서버와 같은 10개씩 */
+export const LEAVE_PAGE_SIZE = 10;
+
+/** 게시판(고쳐주세요/공지/일반문의): 사이트는 15개씩 주지만 폰 한 화면에 들어오게 8개씩 보여줌 */
+export const DORM_SERVER_PAGE_SIZE = 15;
+export const DORM_UI_PAGE_SIZE = 8;
 
 /** 상세 화면 공통 레이아웃 (제목 / 메타 / 본문) */
 export function DetailHeader({ title, meta }: { title: string; meta: string[] }) {
@@ -85,18 +129,20 @@ export const detailStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  row: { minHeight: 70, paddingVertical: 13, flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e1e8ea' },
-  no: { minWidth: 48, paddingTop: 1, textAlign: 'center', color: colors.textFaint, fontSize: font.xs },
+  // 번호 · 제목/작성자 · 날짜를 세로 가운데로 맞춤
+  row: { minHeight: 62, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e1e8ea' },
+  no: { minWidth: 48, textAlign: 'center', color: colors.textFaint, fontSize: font.xs },
   title: { flexShrink: 1, fontSize: font.base, fontWeight: '600', color: colors.text },
-  meta: { marginTop: 5, color: '#909ca1', fontSize: font.xs },
-  date: { color: '#97a2a6', fontSize: font.xs, paddingTop: 1 },
+  meta: { marginTop: 4, color: '#909ca1', fontSize: font.xs },
+  date: { color: '#97a2a6', fontSize: font.xs },
   newBadge: { width: 15, height: 15, borderRadius: 8, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center' },
   newText: { color: 'white', fontSize: 9, fontWeight: '800' },
-  pager: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 },
-  pagerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#dfe5e2', backgroundColor: 'white' },
-  pagerDisabled: { opacity: 0.4 },
-  pagerText: { fontSize: font.sm, color: colors.textBody },
-  pagerPage: { fontSize: font.base, fontWeight: '700', color: colors.primaryDark },
+  pager: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  pagerArrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  pagerDisabled: { opacity: 0.2 },
+  pagerNum: { minWidth: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  pagerNumText: { fontSize: font.base, fontWeight: '500', color: colors.textFaint },
+  pagerNumTextActive: { fontWeight: '800', color: colors.primaryDark },
   detailHead: { paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   detailTitle: { fontSize: 19, fontWeight: '800', color: colors.text, lineHeight: 26 },
   detailMeta: { marginTop: 7, color: colors.textMuted, fontSize: font.xs },

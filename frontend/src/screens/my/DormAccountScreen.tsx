@@ -47,7 +47,7 @@ export default function DormAccountScreen({ navigation }: ScreenProps<'DormAccou
       {loading && !data ? (
         <LoadingView />
       ) : (
-        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 18, paddingBottom: 28 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, padding: 18, paddingBottom: 28 }}>
           <View style={styles.status}>
             <View style={styles.icon}>
               <Icon name="dorm" size={31} color={colors.primaryDark} />

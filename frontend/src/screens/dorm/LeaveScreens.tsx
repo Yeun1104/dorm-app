@@ -8,10 +8,11 @@ import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
 import { Button, Chip, EmptyState, ErrorView, Fab, Field, FormScroll, Input, LoadingView, Screen, SubHeader } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
+import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { daysBetween, parseLocalDate, toLocalDateString } from '../../utils/format';
-import { dormStatusTone, PAGE_SIZE, Pager } from './dormShared';
+import { dormStatusTone, LEAVE_PAGE_SIZE, Pager } from './dormShared';
 
 const TEXT: Record<LeaveKind, { title: string; subtitle: string; guideTitle: string; guide: string }> = {
   outing: {
@@ -42,8 +43,7 @@ function validateRange(kind: LeaveKind, start: Date | null, end: Date | null): s
 export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>) {
   const { kind } = route.params;
   const t = TEXT[kind];
-  const [page, setPage] = useState(0);
-  const { data, error, loading, refreshing, reload, refresh } = useFetch(() => leaveApi.list(kind, page), [kind, page], { refetchOnFocus: true });
+  const list = useSlicedPages((page) => leaveApi.list(kind, page), LEAVE_PAGE_SIZE, LEAVE_PAGE_SIZE, [kind]);
 
   const renderItem = ({ item }: { item: OutingListItem }) => (
     <Pressable
@@ -67,17 +67,18 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
   return (
     <Screen bg={colors.bgSub}>
       <SubHeader title={t.title} subtitle={t.subtitle} />
-      {loading && !data ? (
+      {list.loading && !list.items ? (
         <LoadingView />
-      ) : error && !data ? (
-        <ErrorView message={error} onRetry={reload} />
+      ) : list.error && !list.items ? (
+        <ErrorView message={list.error} onRetry={list.reload} />
       ) : (
         <FlatList
-          data={data ?? []}
+          showsVerticalScrollIndicator={false}
+          data={list.items ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.refresh} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View style={styles.guide}>
               <View style={styles.guideIcon}>
@@ -90,7 +91,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
             </View>
           }
           ListEmptyComponent={<EmptyState icon="calendar" title="신청 내역이 없어요" />}
-          ListFooterComponent={<Pager page={page} hasNext={(data?.length ?? 0) >= PAGE_SIZE} loading={loading} onChange={setPage} />}
+          ListFooterComponent={<Pager page={list.page} pagesInBlock={list.pagesInBlock} hasNextBlock={list.hasNextBlock} loading={list.loading} onChange={list.goTo} />}
         />
       )}
       <Fab label="신청하기" onPress={() => navigation.navigate('LeaveForm', { kind })} />
@@ -130,7 +131,7 @@ export function LeaveDetailScreen({ navigation, route }: ScreenProps<'LeaveDetai
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Chip label={data.resultStatus || '상태 없음'} tone={dormStatusTone(data.resultStatus)} large />
             <Text style={styles.cardNo}>신청번호 {data.applicationNo}</Text>
@@ -201,10 +202,15 @@ export function LeaveFormScreen({ navigation, route }: ScreenProps<'LeaveForm'>)
         <ErrorView message={defaults.error} onRetry={defaults.reload} />
       ) : (
         <FormScroll footer={<Button label="제출" onPress={submit} loading={submitting} />}>
+          {/* 신청자 정보: 이름·호실을 크게, 연락처·최대 종료일은 아래 줄로 */}
           <View style={styles.applicant}>
+            <Text style={styles.applicantCaption}>신청자</Text>
+            <View style={styles.applicantHead}>
+              <Text style={styles.applicantName}>{d?.applicantName || '-'}</Text>
+              <Text style={styles.applicantRoom}>{[d?.room, d?.seat].filter(Boolean).join(' · ') || '-'}</Text>
+            </View>
+            <View style={styles.applicantDivider} />
             {[
-              ['신청자', d?.applicantName],
-              ['호실 · 자리', [d?.room, d?.seat].filter(Boolean).join(' · ')],
               ['연락처', [d?.phone1, d?.phone2, d?.phone3].filter(Boolean).join('-')],
               ['최대 종료일', d?.maxEndDate],
             ].map(([label, value]) => (
@@ -258,9 +264,14 @@ const styles = StyleSheet.create({
   infoValue: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
   memoLabel: { marginTop: 18, marginBottom: 6, fontSize: font.sm, fontWeight: '700', color: '#53605b' },
   memo: { fontSize: font.base, lineHeight: 22, color: colors.textBody },
-  applicant: { marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primarySoft2, gap: 5 },
-  applicantRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  applicantLabel: { color: colors.primaryDark, fontSize: font.xs },
-  applicantValue: { color: colors.primaryDeep, fontSize: font.sm, fontWeight: '700' },
+  applicant: { marginBottom: 18, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: '#fafbfb' },
+  applicantCaption: { fontSize: font.xs, fontWeight: '600', color: colors.textMuted },
+  applicantHead: { marginTop: 4, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 },
+  applicantName: { fontSize: 19, fontWeight: '800', color: colors.text },
+  applicantRoom: { flexShrink: 1, textAlign: 'right', fontSize: font.base, fontWeight: '600', color: colors.textBody },
+  applicantDivider: { height: 1, marginVertical: 13, backgroundColor: colors.borderLight },
+  applicantRow: { paddingVertical: 3, flexDirection: 'row', justifyContent: 'space-between' },
+  applicantLabel: { fontSize: font.md, color: colors.textMuted },
+  applicantValue: { fontSize: font.md, fontWeight: '700', color: colors.text },
   rangeInfo: { marginTop: 8, color: colors.primaryDark, fontSize: font.sm, fontWeight: '600' },
 });

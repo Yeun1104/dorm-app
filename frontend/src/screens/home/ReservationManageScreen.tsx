@@ -156,6 +156,7 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
   else
     body = (
       <FlatList
+        showsVerticalScrollIndicator={false}
         data={visible}
         keyExtractor={(r) => String(r.id)}
         contentContainerStyle={{ padding: 18, paddingBottom: 40 }}

@@ -56,6 +56,7 @@ export type AppStackParamList = {
   MyPosts: undefined;
   DormAccount: undefined;
   Settings: undefined;
+  NotificationSettings: undefined;
 };
 
 export type TabParamList = {

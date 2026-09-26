@@ -135,6 +135,7 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
         <ErrorView message={paged.error} onRetry={paged.reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={boards}
           keyExtractor={(b) => String(b.id)}
           contentContainerStyle={{ padding: 18, paddingBottom: mode === 'mine' ? 100 : 40 }}

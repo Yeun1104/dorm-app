@@ -355,7 +355,7 @@ export function FormScroll({ children, footer }: { children: ReactNode; footer?:
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 30 }} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 30 }} keyboardShouldPersistTaps="handled">
         {children}
       </ScrollView>
       {!!footer && <View style={[s.footerBar, { paddingBottom: Math.max(insets.bottom, 14) }]}>{footer}</View>}

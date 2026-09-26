@@ -36,6 +36,7 @@ import DormAccountScreen from '../screens/my/DormAccountScreen';
 import { LikedBoardsScreen, MyPostsScreen } from '../screens/my/MyBoardListScreen';
 import MyPageScreen from '../screens/my/MyPageScreen';
 import MyReservationsScreen from '../screens/my/MyReservationsScreen';
+import NotificationSettingsScreen from '../screens/my/NotificationSettingsScreen';
 import SettingsScreen from '../screens/my/SettingsScreen';
 import { colors } from '../theme';
 import type { AppStackParamList, AuthStackParamList, TabParamList } from './types';
@@ -58,6 +59,7 @@ function sharedScreens() {
       <Stack.Screen name="Report" component={ReportScreen} />
       <Stack.Screen name="MyPosts" component={MyPostsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     </>
   );
 }

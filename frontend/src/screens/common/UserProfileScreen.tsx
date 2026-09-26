@@ -99,7 +99,7 @@ function ProfileBody({ profile, onBoard, onEditNickname }: { profile: Profile; o
   const list = tab === 'progress' ? profile.inProgressBoards : profile.completedBoards;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
       <View style={styles.hero}>
         <Avatar name={profile.nickname} size={62} />
         {onEditNickname ? (

@@ -38,7 +38,7 @@ export default function DormLinkForm({ onLinked }: { onLinked: () => void }) {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.visual}>
           <Icon name="dorm" size={40} color={colors.primaryDeep} />
           <View style={styles.visualCheck}>

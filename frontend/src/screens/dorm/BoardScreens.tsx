@@ -21,9 +21,10 @@ import {
   SubHeader,
 } from '../../components/ui';
 import { useFetch } from '../../hooks/useFetch';
+import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
-import { BoardRow, DetailHeader, detailStyles, PAGE_SIZE, Pager } from './dormShared';
+import { BoardRow, DetailHeader, detailStyles, DORM_SERVER_PAGE_SIZE, DORM_UI_PAGE_SIZE, Pager } from './dormShared';
 
 type Kind = 'repair' | 'notice' | 'inquiry';
 type Item = RepairListItem | NoticeListItem | InquiryListItem;
@@ -41,19 +42,31 @@ const listFn = { repair: repairApi.list, notice: noticeApi.list, inquiry: inquir
 const normalizeName = (name: string | undefined) => (name ?? '').replace(/[\s\u00a0]/g, '');
 const isMine = (writer: string | undefined, myName: string | undefined) => !!normalizeName(writer) && normalizeName(writer) === normalizeName(myName);
 
+/**
+ * 운영사무실 답변 줄바꿈 복원.
+ * 서버가 사이트의 <br>을 공백으로 합쳐서 내려주기 때문에(DormInquiryService.extractStaffReply → text()),
+ * 문장이 끝나는 곳(. ! ?)마다 줄을 바꿔 읽기 쉽게 함. '1.' 같은 번호 뒤에서는 안 바꿈.
+ */
+const formatReply = (text: string) =>
+  text
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/([^\d\s][.!?])\s+(?=\S)/g, '$1\n').trim())
+    .join('\n\n');
+
 // ───────── 목록 (공통) ─────────
 
 function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: number) => void; onWrite?: () => void }) {
   const [field, setField] = useState<DormSearchField>('TITLE');
   const [keyword, setKeyword] = useState('');
-  const [query, setQuery] = useState({ keyword: '', field: 'TITLE' as DormSearchField, page: 0 });
-  const { data, error, loading, refreshing, reload, refresh } = useFetch(
-    () => listFn[kind](query) as Promise<Item[]>,
+  const [query, setQuery] = useState({ keyword: '', field: 'TITLE' as DormSearchField });
+  const list = useSlicedPages(
+    (page) => listFn[kind]({ ...query, page }) as Promise<Item[]>,
+    DORM_SERVER_PAGE_SIZE,
+    DORM_UI_PAGE_SIZE,
     [kind, query],
-    { refetchOnFocus: true },
   );
 
-  const search = () => setQuery({ keyword, field, page: 0 });
+  const search = () => setQuery({ keyword, field });
 
   const renderItem = ({ item }: { item: Item }) => {
     const inquiry = kind === 'inquiry' ? (item as InquiryListItem) : null;
@@ -65,7 +78,7 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
         title={
           <>
             {item.title}
-            {inquiry && inquiry.replyCount > 0 && <Text style={styles.reply}> ({inquiry.replyCount})</Text>}
+            {inquiry && inquiry.replyCount > 0 && <Text style={styles.replyCount}> ({inquiry.replyCount})</Text>}
           </>
         }
         meta={`${item.writer} · 조회 ${item.viewCount}`}
@@ -77,26 +90,26 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
 
   return (
     <>
-      {loading && !data ? (
+      {/* 검색창은 목록 밖(위)에 둬야 필드 선택 드롭다운이 글 목록 위에 제대로 덮임 */}
+      <View style={styles.searchWrap}>
+        <BoardSearchBar field={field} onFieldChange={setField} keyword={keyword} onKeywordChange={setKeyword} onSubmit={search} />
+      </View>
+      {list.loading && !list.items ? (
         <LoadingView />
-      ) : error && !data ? (
-        <ErrorView message={error} onRetry={reload} />
+      ) : list.error && !list.items ? (
+        <ErrorView message={list.error} onRetry={list.reload} />
       ) : (
         <FlatList
-          data={data ?? []}
+          showsVerticalScrollIndicator={false}
+          data={list.items ?? []}
           keyExtractor={(i) => `${i.displayNo}-${i.no}`}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-          ListHeaderComponent={
-            <View style={{ marginBottom: 6, zIndex: 10 }}>
-              <BoardSearchBar field={field} onFieldChange={setField} keyword={keyword} onKeywordChange={setKeyword} onSubmit={search} />
-            </View>
-          }
+          refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.refresh} tintColor={colors.primary} />}
           ListEmptyComponent={<EmptyState icon="doc" title={query.keyword ? '검색 결과가 없어요' : META[kind].empty} />}
           ListFooterComponent={
-            <Pager page={query.page} hasNext={(data?.length ?? 0) >= PAGE_SIZE} loading={loading} onChange={(page) => setQuery((q) => ({ ...q, page }))} />
+            <Pager page={list.page} pagesInBlock={list.pagesInBlock} hasNextBlock={list.hasNextBlock} loading={list.loading} onChange={list.goTo} />
           }
         />
       )}
@@ -170,7 +183,7 @@ export function RepairDetailScreen({ navigation, route }: ScreenProps<'RepairDet
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.detail.title} meta={[data.detail.writer, `조회 ${data.detail.viewCount}`, data.detail.writtenAt]} />
           <View style={styles.visit}>
             <Text style={styles.visitLabel}>방이 비어있을 때 방문</Text>
@@ -200,7 +213,7 @@ export function NoticeDetailScreen({ route }: ScreenProps<'NoticeDetail'>) {
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.title} meta={[data.writer, `조회 ${data.viewCount}`, data.writtenAt]} />
           {data.blocks?.length ? (
             data.blocks.map((block, i) => <NoticeBlockView key={i} block={block} />)
@@ -272,9 +285,20 @@ export function InquiryDetailScreen({ navigation, route }: ScreenProps<'InquiryD
           <EmptyState icon="lock" title="🔒 비밀글입니다" message="작성자와 관리자만 볼 수 있어요." />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           <DetailHeader title={data.detail.title} meta={[data.detail.writer, `조회 ${data.detail.viewCount}`, data.detail.writtenAt]} />
           <Text style={detailStyles.body}>{data.detail.content}</Text>
+          {!!data.detail.staffReply && (
+            <View style={styles.reply}>
+              <View style={styles.replyHead}>
+                <View style={styles.replyIcon}>
+                  <Icon name="dorm" size={13} color="white" strokeWidth={2.2} />
+                </View>
+                <Text style={styles.replyTitle}>운영사무실 답변</Text>
+              </View>
+              <Text style={styles.replyText}>{formatReply(data.detail.staffReply)}</Text>
+            </View>
+          )}
           {data.mine && (
             <View style={detailStyles.actions}>
               <Button label="수정" variant="outline" onPress={() => navigation.navigate('InquiryForm', { no })} style={{ flex: 1, height: 46 }} />
@@ -429,7 +453,14 @@ function WriterInfo({ name, email }: { name: string; email: string }) {
 }
 
 const styles = StyleSheet.create({
-  reply: { color: colors.primaryDark, fontWeight: '700' },
+  searchWrap: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 6, zIndex: 10, elevation: 10 },
+  // 질문 본문과 충분히 떨어뜨려서 아래쪽에 배치
+  reply: { marginTop: 26, marginBottom: 10, padding: 18, borderRadius: 16, backgroundColor: '#f3f6f5' },
+  replyHead: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  replyIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center' },
+  replyTitle: { fontSize: font.sm, fontWeight: '800', color: colors.text },
+  replyText: { fontSize: font.base, lineHeight: 25, color: colors.textBody },
+  replyCount: { color: colors.primaryDark, fontWeight: '700' },
   visit: { marginTop: 14, padding: 12, flexDirection: 'row', justifyContent: 'space-between', borderRadius: 11, backgroundColor: '#f5f7f6' },
   visitLabel: { fontSize: font.sm, color: '#78837f' },
   visitValue: { fontSize: font.sm, fontWeight: '700', color: colors.text },

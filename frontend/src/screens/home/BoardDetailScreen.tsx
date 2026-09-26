@@ -191,7 +191,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* 이미지 */}
         {board.images.length > 0 ? (
           <View>
@@ -240,12 +240,17 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
 
           <View style={styles.progressCard}>
             <View style={styles.progressHead}>
-              <Text style={styles.progressTitle}>{collected}개 모였어요</Text>
+              <Text style={styles.progressTitle}>
+                {collected}
+                <Text style={styles.participants}> / {board.totalQuantity}개</Text>
+              </Text>
               <Text style={styles.progressPct}>{Math.round(progress * 100)}%</Text>
             </View>
             <ProgressBar ratio={progress} />
             <Text style={styles.progressHint}>
-              {board.remainingQuantity > 0 ? `${board.remainingQuantity}개만 더 모이면 공동구매가 완료돼요` : '목표 수량이 모두 모였어요'}
+              {[board.remainingQuantity > 0 ? `${board.remainingQuantity}개 남음` : '목표 수량 달성', board.participantCount > 0 && `${board.participantCount}명 참여`]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
             {board.waitingCount > 0 && <Text style={styles.waitingHint}>현재 {board.waitingCount}명 수락 대기중</Text>}
           </View>
@@ -260,12 +265,6 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
             )}
           </View>
 
-          {!mine && (
-            <View style={styles.safeNote}>
-              <Text style={styles.safeTitle}>안심하고 거래하세요</Text>
-              <Text style={styles.safeText}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
-            </View>
-          )}
         </View>
       </ScrollView>
 
@@ -279,27 +278,39 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
           <Pressable style={styles.roundBtn} onPress={() => toast('공유 기능은 준비 중이에요')}>
             <Icon name="share" color="white" />
           </Pressable>
-          {mine && (
-            <Pressable style={styles.roundBtn} onPress={() => setMenu((v) => !v)}>
-              <Text style={{ color: 'white', fontWeight: '800', letterSpacing: 1 }}>•••</Text>
-            </Pressable>
-          )}
+          <Pressable style={styles.roundBtn} onPress={() => setMenu((v) => !v)} accessibilityLabel="더보기">
+            <Text style={{ color: 'white', fontWeight: '800', letterSpacing: 1 }}>•••</Text>
+          </Pressable>
         </View>
       </View>
       {menu && (
         <View style={[styles.menu, { top: insets.top + 58 }]}>
-          <Pressable
-            style={styles.menuItem}
-            onPress={() => {
-              setMenu(false);
-              navigation.navigate('BoardWrite', { boardId });
-            }}
-          >
-            <Text style={{ color: colors.text, fontSize: font.md }}>게시글 수정</Text>
-          </Pressable>
-          <Pressable style={styles.menuItem} onPress={deleteBoard}>
-            <Text style={{ color: colors.danger, fontSize: font.md }}>게시글 삭제</Text>
-          </Pressable>
+          {mine ? (
+            <>
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenu(false);
+                  navigation.navigate('BoardWrite', { boardId });
+                }}
+              >
+                <Text style={{ color: colors.text, fontSize: font.md }}>게시글 수정</Text>
+              </Pressable>
+              <Pressable style={styles.menuItem} onPress={deleteBoard}>
+                <Text style={{ color: colors.danger, fontSize: font.md }}>게시글 삭제</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setMenu(false);
+                navigation.navigate('Report', { userId: board.authorId, nickname: board.authorNickname, boardId });
+              }}
+            >
+              <Text style={{ color: colors.danger, fontSize: font.md }}>신고하기</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -339,6 +350,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
           <Text style={{ fontSize: font.md, fontWeight: '800' }}>{won(board.unitPrice * quantity)}</Text>
         </View>
         <Button label="참여 요청 보내기" onPress={sendRequest} loading={busy} />
+        <Text style={styles.sheetNote}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
       </BottomSheet>
     </View>
   );
@@ -380,7 +392,8 @@ const styles = StyleSheet.create({
   statValue: { fontSize: font.md, fontWeight: '700', color: colors.text },
   progressCard: { padding: 18, borderWidth: 1, borderColor: '#d8e8ed', borderRadius: 17 },
   progressHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  progressTitle: { fontSize: font.base, fontWeight: '700', color: colors.text },
+  progressTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  participants: { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },
   progressPct: { fontSize: font.base, fontWeight: '700', color: colors.primaryDark },
   progressHint: { marginTop: 8, color: '#84908b', fontSize: font.xs },
   waitingHint: { marginTop: 4, color: '#e2763f', fontSize: font.xs, fontWeight: '700' },
@@ -388,9 +401,6 @@ const styles = StyleSheet.create({
   infoRow: { minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   infoLabel: { color: '#89928f', fontSize: font.sm },
   infoValue: { color: colors.text, fontSize: font.sm, fontWeight: '600', flexShrink: 1, textAlign: 'right', marginLeft: 12 },
-  safeNote: { marginTop: 14, padding: 15, borderRadius: 14, backgroundColor: '#fff9e9' },
-  safeTitle: { fontSize: font.sm, fontWeight: '700', color: '#9b751d' },
-  safeText: { marginTop: 3, color: '#95865f', fontSize: font.xs },
 
   overlayHeader: { position: 'absolute', left: 15, right: 15, flexDirection: 'row', justifyContent: 'space-between' },
   roundBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(10,22,18,0.38)', alignItems: 'center', justifyContent: 'center' },
@@ -411,6 +421,7 @@ const styles = StyleSheet.create({
   rejected: { marginBottom: 8, color: colors.warning, fontSize: font.sm, fontWeight: '700' },
 
   sheetTitle: { fontSize: 21, fontWeight: '800', color: colors.text, marginBottom: 5 },
+  sheetNote: { marginTop: 10, textAlign: 'center', fontSize: font.xs, color: colors.textMuted },
   sheetSub: { color: '#858f8b', fontSize: font.sm },
   qtyControl: { marginVertical: 25, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 34 },
   qtyBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#dfe6e3', alignItems: 'center', justifyContent: 'center' },

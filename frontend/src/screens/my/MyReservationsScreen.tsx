@@ -88,6 +88,7 @@ export default function MyReservationsScreen({ navigation }: ScreenProps<'MyRese
         <ErrorView message={error} onRetry={reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={list}
           keyExtractor={(r) => String(r.id)}
           renderItem={renderItem}

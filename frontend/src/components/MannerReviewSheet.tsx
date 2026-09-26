@@ -5,7 +5,6 @@ import { mannerApi } from '../api/trade';
 import type { MannerKeywordType } from '../api/types';
 import { MANNER_KEYWORDS } from '../constants';
 import { colors, font } from '../theme';
-import { markReviewed } from '../utils/reviewed';
 import { useToast } from './Feedback';
 import Icon from './Icon';
 import { Avatar, BottomSheet, Button } from './ui';
@@ -55,7 +54,6 @@ export default function MannerReviewSheet({
     setSubmitting(true);
     try {
       await mannerApi.review(reservationId, selected);
-      await markReviewed(reservationId).catch(() => {});
       toast('매너 평가를 보냈어요');
       onReviewed?.();
       onClose();
@@ -63,7 +61,6 @@ export default function MannerReviewSheet({
       toast(errorMessage(e));
       // 이미 평가한 거래면 배너를 다시 띄우지 않도록
       if (/이미|ALREADY/.test(errorMessage(e))) {
-        await markReviewed(reservationId).catch(() => {});
         onReviewed?.();
         onClose();
       }

@@ -67,19 +67,27 @@ export function SpointScreen(_: ScreenProps<'Spoint'>) {
 
 // ───────── 입사신청/선발내역 ─────────
 
+/** 룸메이트 칸: '확정'이면 강조색, 그 외(미확정/대기 등)는 회색 */
+const roommateConfirmed = (info: string) => /확정/.test(info) && !/미확정|불/.test(info);
+
 export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
   const { data, error, loading, refreshing, reload, refresh } = useFetch(() => ipsaApi.list(), []);
 
   const renderItem = ({ item }: { item: IpsaListItem }) => (
     <Pressable style={styles.ipsaCard} onPress={() => navigation.navigate('IpsaDetail', { mozipCode: item.mozipCode, title: item.recruitType })}>
-      <View style={{ flex: 1, gap: 6 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <Chip label={item.selectionStatus || '-'} tone={dormStatusTone(item.selectionStatus)} />
           <Text style={styles.ipsaTitle} numberOfLines={1}>{item.recruitType}</Text>
         </View>
         <Text style={styles.ipsaMeta}>거주기간 {item.residencePeriod || '-'}</Text>
-        {!!item.roommateInfo && <Text style={styles.ipsaMeta}>룸메이트 {item.roommateInfo}</Text>}
       </View>
+      {!!item.roommateInfo && (
+        <View style={[styles.roommate, roommateConfirmed(item.roommateInfo) && styles.roommateOn]}>
+          <Text style={styles.roommateLabel}>룸메이트</Text>
+          <Text style={[styles.roommateValue, roommateConfirmed(item.roommateInfo) && styles.roommateValueOn]} numberOfLines={1}>{item.roommateInfo}</Text>
+        </View>
+      )}
       <Icon name="chevron" size={18} color="#9aa29f" />
     </Pressable>
   );
@@ -93,11 +101,18 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
         <ErrorView message={error} onRetry={reload} />
       ) : (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={data ?? []}
           keyExtractor={(i) => String(i.mozipCode)}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+          ListHeaderComponent={
+            <View style={styles.ipsaNotice}>
+              <Icon name="notice" size={16} color={colors.textBody} />
+              <Text style={styles.ipsaNoticeText}>입사 신청은 기숙사 사이트에서 할 수 있어요. 여기서는 신청·선발 내역만 확인할 수 있어요.</Text>
+            </View>
+          }
           ListEmptyComponent={<EmptyState icon="doc" title="입사신청 내역이 없어요" />}
         />
       )}
@@ -105,29 +120,100 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
   );
 }
 
+/**
+ * 선발내역 상세는 사이트 표의 라벨→값 맵으로 옴. 사이트 화면처럼 주제별로 묶어서 보여주고,
+ * 모르는 라벨이 새로 생겨도 빠지지 않게 '기타'로 모음.
+ */
+const IPSA_SECTIONS: { title: string; keys: string[] }[] = [
+  { title: '생활관비 납부', keys: ['입금여부', '실입금일', '입금계좌'] },
+  { title: '룸메이트', keys: ['룸메이트 신청여부', '룸메이트'] },
+  { title: '신청 정보', keys: ['성명', '학번', '전공구분', '학년', '재학생/신입생 구분', '성별', '입사우대', '생활형태', '주민등록번호', '주소'] },
+];
+/** 위쪽 요약 카드에서 쓰는 라벨 */
+const IPSA_SUMMARY_KEYS = ['모집구분', '배정호실', '인실구분', '사용기간', '입사기간', '세부금액'];
+
+/** '합계: 1,482,400원 = 생활관비: 1,482,400원' → { total: '1,482,400원', detail: '생활관비 1,482,400원' } */
+function parseAmount(v: string | undefined) {
+  if (!v) return null;
+  const total = v.match(/합계\s*:?\s*([\d,]+\s*원)/)?.[1];
+  if (!total) return { total: v, detail: null };
+  const detail = v.split('=').slice(1).join('=').replace(/\s*:\s*/g, ' ').trim();
+  return { total, detail: detail || null };
+}
+
 export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
   const { mozipCode, title } = route.params;
   const { data, error, loading, reload } = useFetch(() => ipsaApi.detail(mozipCode), [mozipCode]);
-  // 필드 구성이 건마다 다를 수 있어 고정 레이아웃 대신 fields 맵을 순서대로 렌더링
-  const entries = Object.entries(data?.fields ?? {});
+  // 빈 값('-' 포함)은 생략
+  const fields = Object.fromEntries(Object.entries(data?.fields ?? {}).filter(([, v]) => v && v.trim() && v.trim() !== '-'));
+  const get = (key: string) => fields[key] as string | undefined;
+  const known = new Set([...IPSA_SUMMARY_KEYS, ...IPSA_SECTIONS.flatMap((sec) => sec.keys)]);
+  const sections = [
+    ...IPSA_SECTIONS.map((sec) => ({ title: sec.title, rows: sec.keys.filter((k) => get(k)).map((k) => [k, get(k)!] as const) })),
+    { title: '기타', rows: Object.entries(fields).filter(([k]) => !known.has(k)) },
+  ].filter((sec) => sec.rows.length > 0);
+  const amount = parseAmount(get('세부금액'));
+  const paid = get('입금여부');
+
   return (
-    <Screen bg="white">
-      <SubHeader title="선발내역 상세" subtitle={title} />
+    <Screen bg={colors.bgSub}>
+      <SubHeader title="선발내역 상세" />
       {loading && !data ? (
         <LoadingView />
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
+      ) : Object.keys(fields).length === 0 ? (
+        <EmptyState icon="doc" title="표시할 정보가 없어요" />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-          <View style={styles.fieldTable}>
-            {entries.map(([label, value], i) => (
-              <View key={label} style={[styles.fieldRow, i < entries.length - 1 && styles.fieldDivider]}>
-                <Text style={styles.fieldLabel}>{label}</Text>
-                <Text style={styles.fieldValue}>{value || '-'}</Text>
+        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 36 }} showsVerticalScrollIndicator={false}>
+          {/* 요약: 모집구분 / 배정호실 · 인실 / 사용·입사기간 / 생활관비 합계 */}
+          <View style={styles.ipsaHero}>
+            <Text style={styles.ipsaHeroCaption}>{get('모집구분') ?? title}</Text>
+            <View style={styles.ipsaRoomRow}>
+              <Text style={styles.ipsaRoom}>{get('배정호실') ?? '호실 배정 전'}</Text>
+              {!!get('인실구분') && <Text style={styles.ipsaRoomType}>{get('인실구분')}</Text>}
+            </View>
+            {(get('사용기간') || get('입사기간')) && (
+              <View style={styles.ipsaDates}>
+                {[
+                  ['사용기간', get('사용기간')],
+                  ['입사기간', get('입사기간')],
+                ]
+                  .filter(([, v]) => v)
+                  .map(([label, value]) => (
+                    <View key={label} style={styles.ipsaDateRow}>
+                      <Icon name="calendar" size={14} color={colors.primaryDeep} />
+                      <Text style={styles.ipsaDateLabel}>{label}</Text>
+                      <Text style={styles.ipsaDateValue}>{value}</Text>
+                    </View>
+                  ))}
               </View>
-            ))}
+            )}
+            {amount && (
+              <View style={styles.ipsaAmount}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ipsaAmountLabel}>생활관비</Text>
+                  {!!amount.detail && <Text style={styles.ipsaAmountDetail}>{amount.detail}</Text>}
+                </View>
+                <Text style={styles.ipsaAmountValue}>{amount.total}</Text>
+                {!!paid && <Chip label={paid} tone={/미/.test(paid) ? 'danger' : 'primary'} />}
+              </View>
+            )}
           </View>
-          {entries.length === 0 && <EmptyState icon="doc" title="표시할 정보가 없어요" />}
+
+          {sections.map((sec) => (
+            <View key={sec.title} style={{ marginTop: 20 }}>
+              <Text style={styles.ipsaSectionTitle}>{sec.title}</Text>
+              <View style={styles.ipsaList}>
+                {sec.rows.map(([label, value], i) => (
+                  <View key={label} style={[styles.ipsaRow, i < sec.rows.length - 1 && styles.ipsaRowDivider]}>
+                    <Text style={styles.ipsaRowLabel}>{label}</Text>
+                    <Text style={styles.ipsaRowValue}>{value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
         </ScrollView>
       )}
     </Screen>
@@ -215,7 +301,7 @@ export function FoodMenuScreen(_: ScreenProps<'FoodMenu'>) {
       ) : error || !data ? (
         <ErrorView message={error ?? '식단을 불러오지 못했어요'} onRetry={reload} />
       ) : (
-        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 28 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingBottom: 28 }}>
           <View style={styles.dayTabs}>
             {data.days.map((d, i) => {
               const active = i === dayIndex;
@@ -331,11 +417,32 @@ const styles = StyleSheet.create({
   ipsaCard: { marginBottom: 10, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, borderWidth: 1, borderColor: '#e6ebe9', backgroundColor: 'white' },
   ipsaTitle: { flexShrink: 1, fontSize: font.base, fontWeight: '700', color: colors.text },
   ipsaMeta: { fontSize: font.xs, color: colors.textMuted },
-  fieldTable: { borderWidth: 1, borderColor: '#e6ebe9', borderRadius: 16, overflow: 'hidden' },
-  fieldRow: { paddingHorizontal: 14, paddingVertical: 13, flexDirection: 'row', gap: 12 },
-  fieldDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  fieldLabel: { width: 100, color: '#89928f', fontSize: font.sm },
-  fieldValue: { flex: 1, color: colors.text, fontSize: font.sm, fontWeight: '600' },
+  ipsaNotice: { marginBottom: 14, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, backgroundColor: '#eef2f1' },
+  ipsaNoticeText: { flex: 1, fontSize: font.sm, lineHeight: 19, color: colors.textBody },
+  roommate: { maxWidth: 110, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', borderRadius: 12, backgroundColor: '#f1f3f2' },
+  roommateOn: { backgroundColor: colors.primarySoft2 },
+  roommateLabel: { fontSize: 10, color: colors.textMuted },
+  roommateValue: { marginTop: 1, fontSize: font.sm, fontWeight: '700', color: colors.textBody },
+  roommateValueOn: { color: colors.primaryDeep },
+  ipsaHero: { padding: 20, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
+  ipsaHeroCaption: { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },
+  ipsaRoomRow: { marginTop: 6, flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  ipsaRoom: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
+  ipsaRoomType: { fontSize: font.md, fontWeight: '600', color: colors.textBody },
+  ipsaDates: { marginTop: 14, gap: 6 },
+  ipsaDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ipsaDateLabel: { width: 52, fontSize: font.sm, color: colors.textMuted },
+  ipsaDateValue: { fontSize: font.sm, fontWeight: '700', color: colors.primaryDeep },
+  ipsaAmount: { marginTop: 16, paddingTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  ipsaAmountLabel: { fontSize: font.sm, color: colors.textMuted },
+  ipsaAmountDetail: { marginTop: 2, fontSize: font.xs, color: colors.textFaint },
+  ipsaAmountValue: { fontSize: 18, fontWeight: '800', color: colors.text },
+  ipsaSectionTitle: { marginBottom: 8, marginLeft: 4, fontSize: font.md, fontWeight: '800', color: colors.text },
+  ipsaList: { paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
+  ipsaRow: { minHeight: 46, paddingVertical: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  ipsaRowDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  ipsaRowLabel: { width: 92, fontSize: font.md, lineHeight: 20, color: colors.textMuted },
+  ipsaRowValue: { flex: 1, textAlign: 'right', fontSize: font.md, lineHeight: 20, fontWeight: '600', color: colors.text },
 
   weekNav: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   weekBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: '#e1e6e4', backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
