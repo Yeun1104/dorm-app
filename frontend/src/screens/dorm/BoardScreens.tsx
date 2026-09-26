@@ -41,6 +41,17 @@ const listFn = { repair: repairApi.list, notice: noticeApi.list, inquiry: inquir
 const normalizeName = (name: string | undefined) => (name ?? '').replace(/[\s\u00a0]/g, '');
 const isMine = (writer: string | undefined, myName: string | undefined) => !!normalizeName(writer) && normalizeName(writer) === normalizeName(myName);
 
+/**
+ * 운영사무실 답변 줄바꿈 복원.
+ * 서버가 사이트의 <br>을 공백으로 합쳐서 내려주기 때문에(DormInquiryService.extractStaffReply → text()),
+ * 문장이 끝나는 곳(. ! ?)마다 줄을 바꿔 읽기 쉽게 함. '1.' 같은 번호 뒤에서는 안 바꿈.
+ */
+const formatReply = (text: string) =>
+  text
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/([^\d\s][.!?])\s+(?=\S)/g, '$1\n').trim())
+    .join('\n\n');
+
 // ───────── 목록 (공통) ─────────
 
 function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: number) => void; onWrite?: () => void }) {
@@ -282,7 +293,7 @@ export function InquiryDetailScreen({ navigation, route }: ScreenProps<'InquiryD
                 </View>
                 <Text style={styles.replyTitle}>운영사무실 답변</Text>
               </View>
-              <Text style={styles.replyText}>{data.detail.staffReply}</Text>
+              <Text style={styles.replyText}>{formatReply(data.detail.staffReply)}</Text>
             </View>
           )}
           {data.mine && (
@@ -440,11 +451,12 @@ function WriterInfo({ name, email }: { name: string; email: string }) {
 
 const styles = StyleSheet.create({
   searchWrap: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 6, zIndex: 10, elevation: 10 },
-  reply: { marginBottom: 6, padding: 16, borderRadius: 16, backgroundColor: '#f3f6f5' },
-  replyHead: { marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  // 질문 본문과 충분히 떨어뜨려서 아래쪽에 배치
+  reply: { marginTop: 26, marginBottom: 10, padding: 18, borderRadius: 16, backgroundColor: '#f3f6f5' },
+  replyHead: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
   replyIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center' },
   replyTitle: { fontSize: font.sm, fontWeight: '800', color: colors.text },
-  replyText: { fontSize: font.base, lineHeight: 23, color: colors.textBody },
+  replyText: { fontSize: font.base, lineHeight: 25, color: colors.textBody },
   replyCount: { color: colors.primaryDark, fontWeight: '700' },
   visit: { marginTop: 14, padding: 12, flexDirection: 'row', justifyContent: 'space-between', borderRadius: 11, backgroundColor: '#f5f7f6' },
   visitLabel: { fontSize: font.sm, color: '#78837f' },
