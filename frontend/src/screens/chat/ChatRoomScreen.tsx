@@ -2,7 +2,7 @@ import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '../../api/client';
-import { chatApi, reservationApi } from '../../api/trade';
+import { chatApi, mannerApi, reservationApi } from '../../api/trade';
 import type { ChatMessage, Reservation } from '../../api/types';
 import { useMe } from '../../auth/AuthContext';
 import { useChatSocket } from '../../chat/useChatSocket';
@@ -16,7 +16,6 @@ import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { clockTime, parseServerDate, won } from '../../utils/format';
-import { isReviewed } from '../../utils/reviewed';
 import { isMyBoard } from '../home/BoardDetailScreen';
 
 export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatRoom'>) {
@@ -73,14 +72,15 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
 
   const { connected, send } = useChatSocket(roomId, (msg) => setMessages((prev) => [msg, ...prev]));
 
-  // 읽음 처리: 개별 메시지엔 id가 없어서 방의 lastMessageId 기준으로 처리.
-  // 들어올 때(+포커스 복귀 시 방 정보 재조회됨) 한 번, 나갈 때 그 사이 받은 메시지까지 한 번 더.
-  // 거래완료된 방이면 내가 이미 매너 평가를 보냈는지 (기기 기록)
+  // 거래완료된 방이면 내가 이미 매너 평가를 보냈는지 (서버 기준 — 다른 기기에서도 정확)
   const completedReservationId = info.data?.reservation?.status === 'COMPLETED' ? info.data.reservation.id : null;
   useEffect(() => {
     if (completedReservationId == null) return;
-    isReviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(false));
+    mannerApi.reviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(true));
   }, [completedReservationId]);
+
+  // 읽음 처리: 개별 메시지엔 id가 없어서 방의 lastMessageId 기준으로 처리.
+  // 들어올 때(+포커스 복귀 시 방 정보 재조회됨) 한 번, 나갈 때 그 사이 받은 메시지까지 한 번 더.
 
   const lastMessageId = info.data?.room.lastMessageId;
   useEffect(() => {
@@ -139,6 +139,20 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     } catch (e) {
       toast(errorMessage(e));
       info.reload();
+    }
+  };
+
+  // 이 채팅방만 알림 끄기/켜기
+  const toggleMute = async () => {
+    setMenu(false);
+    const muted = !room.notificationMuted;
+    info.setData((d) => (d ? { ...d, room: { ...d.room, notificationMuted: muted } } : d));
+    try {
+      await chatApi.setMuted(roomId, muted);
+      toast(muted ? '이 채팅방 알림을 껐어요' : '이 채팅방 알림을 켰어요');
+    } catch (e) {
+      info.setData((d) => (d ? { ...d, room: { ...d.room, notificationMuted: !muted } } : d));
+      toast(errorMessage(e));
     }
   };
 
@@ -201,7 +215,10 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
           <Avatar name={other?.userName ?? room.name} size={31} />
           <View>
             <Text style={styles.personName}>{other?.userName ?? room.name}</Text>
-            <Text style={styles.personSub}>{connected ? '연결됨' : '연결 중…'}</Text>
+            <Text style={styles.personSub}>
+              {connected ? '연결됨' : '연결 중…'}
+              {room.notificationMuted ? ' · 알림 꺼짐' : ''}
+            </Text>
           </View>
         </Pressable>
         <Pressable onPress={() => setMenu((v) => !v)} hitSlop={8}>
@@ -221,6 +238,9 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
               <Text style={styles.menuText}>신고하기</Text>
             </Pressable>
           )}
+          <Pressable style={styles.menuItem} onPress={toggleMute}>
+            <Text style={styles.menuText}>{room.notificationMuted ? '알림 켜기' : '알림 끄기'}</Text>
+          </Pressable>
           <Pressable style={styles.menuItem} onPress={leave}>
             <Text style={[styles.menuText, { color: colors.danger }]}>채팅방 나가기</Text>
           </Pressable>

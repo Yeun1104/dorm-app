@@ -8,7 +8,6 @@ import { MANNER_KEYWORDS } from '../constants';
 import { invalidateBoard } from '../hooks/useBoards';
 import { colors, font } from '../theme';
 import { won } from '../utils/format';
-import { markReviewed } from '../utils/reviewed';
 import { useToast } from './Feedback';
 import Icon from './Icon';
 import { Avatar, BottomSheet, Button, Thumb } from './ui';
@@ -107,7 +106,6 @@ export default function SaleCompleteSheet({
     setBusy(true);
     try {
       const results = await Promise.allSettled(traded.map((r) => mannerApi.review(r.id, keywords)));
-      traded.forEach((r) => markReviewed(r.id).catch(() => {}));
       const failed = results.filter((r) => r.status === 'rejected').length;
       toast(failed ? `${traded.length - failed}명에게 매너 평가를 보냈어요 (${failed}명 실패)` : '판매완료 처리하고 매너 평가를 보냈어요');
       onClose();
