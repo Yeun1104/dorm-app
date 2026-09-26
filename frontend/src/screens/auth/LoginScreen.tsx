@@ -40,7 +40,7 @@ export default function LoginScreen({ navigation }: NativeStackScreenProps<AuthS
       <View style={styles.center}>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>숭실대 기숙사 공동구매</Text>
-          <Text style={styles.title}>나누다</Text>
+          <Text style={styles.title}>나눠도</Text>
           <Text style={styles.subtitle}>같이 사면 가격은 반으로!{'\n'}기숙사 이웃과 알뜰하게 나눠요</Text>
         </View>
 

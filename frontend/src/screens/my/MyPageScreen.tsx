@@ -26,7 +26,7 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
   const count = (s: string) => reservations.data?.filter((r) => r.status === s).length ?? 0;
 
   const openInquiry = () =>
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[나누다] 문의')}`).catch(() => toast('메일 앱을 열 수 없어요'));
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[나눠도] 문의')}`).catch(() => toast('메일 앱을 열 수 없어요'));
 
   return (
     <Screen>
@@ -97,7 +97,7 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
           <Icon name="chevron" size={18} color={colors.textMuted} />
         </Pressable>
 
-        <Text style={styles.version}>나누다 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
+        <Text style={styles.version}>나눠도 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
       </ScrollView>
     </Screen>
   );

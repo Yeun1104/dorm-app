@@ -32,7 +32,7 @@ export default function SignupScreen({ route }: NativeStackScreenProps<AuthStack
       <SubHeader title="회원가입" />
       <FormScroll footer={<Button label="시작하기" onPress={submit} loading={loading} />}>
         <View style={{ paddingVertical: 20 }}>
-          <Text style={{ fontSize: 21, fontWeight: '800', color: colors.text }}>나누다에서 쓸{'\n'}닉네임을 정해주세요</Text>
+          <Text style={{ fontSize: 21, fontWeight: '800', color: colors.text }}>나눠도에서 쓸{'\n'}닉네임을 정해주세요</Text>
           <Text style={{ marginTop: 8, fontSize: font.md, color: colors.textMuted }}>거래 상대에게 보여지는 이름이에요.</Text>
         </View>
         <Field label="닉네임" error={error}>
