@@ -12,7 +12,7 @@ import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { daysBetween, parseLocalDate, toLocalDateString } from '../../utils/format';
-import { dormStatusTone, LEAVE_PAGE_SIZE, Pager } from './dormShared';
+import { dormStatusTone, InfoTable, LEAVE_PAGE_SIZE, SimplePager } from './dormShared';
 
 const TEXT: Record<LeaveKind, { title: string; subtitle: string; guideTitle: string; guide: string }> = {
   outing: {
@@ -91,7 +91,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
             </View>
           }
           ListEmptyComponent={<EmptyState icon="calendar" title="신청 내역이 없어요" />}
-          ListFooterComponent={<Pager page={list.page} pagesInBlock={list.pagesInBlock} hasNextBlock={list.hasNextBlock} loading={list.loading} onChange={list.goTo} />}
+          ListFooterComponent={<SimplePager page={list.page} hasNext={list.hasNext} loading={list.loading} onChange={list.goTo} />}
         />
       )}
       <Fab label="신청하기" onPress={() => navigation.navigate('LeaveForm', { kind })} />
@@ -132,27 +132,25 @@ export function LeaveDetailScreen({ navigation, route }: ScreenProps<'LeaveDetai
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <View style={styles.detailTop}>
             <Chip label={data.resultStatus || '상태 없음'} tone={dormStatusTone(data.resultStatus)} large />
             <Text style={styles.cardNo}>신청번호 {data.applicationNo}</Text>
           </View>
-          <Text style={styles.detailPeriod}>{data.startDate} — {data.endDate}</Text>
-          <View style={styles.infoList}>
-            {[
-              ['신청자', data.applicantName],
-              ['호실', data.room],
-              ['자리', data.seat],
-              ['연락처', data.phone],
-              ['작성일', data.writtenAt],
-            ].map(([label, value]) => (
-              <View key={label} style={styles.infoRow}>
-                <Text style={styles.infoLabel}>{label}</Text>
-                <Text style={styles.infoValue}>{value || '-'}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.memoLabel}>사유</Text>
-          <Text style={styles.memo}>{data.memo || '-'}</Text>
+          <InfoTable
+            rows={[
+              [['신청기간', `${data.startDate} ~ ${data.endDate}`]],
+              [
+                ['신청자', data.applicantName],
+                ['작성일', data.writtenAt],
+              ],
+              [
+                ['호실', data.room],
+                ['자리', data.seat],
+              ],
+              [['연락처', data.phone]],
+              [['사유', data.memo]],
+            ]}
+          />
           <Button label="삭제" variant="dangerOutline" onPress={remove} loading={deleting} style={{ marginTop: 24, height: 48 }} />
         </ScrollView>
       )}
@@ -202,24 +200,19 @@ export function LeaveFormScreen({ navigation, route }: ScreenProps<'LeaveForm'>)
         <ErrorView message={defaults.error} onRetry={defaults.reload} />
       ) : (
         <FormScroll footer={<Button label="제출" onPress={submit} loading={submitting} />}>
-          {/* 신청자 정보: 이름·호실을 크게, 연락처·최대 종료일은 아래 줄로 */}
-          <View style={styles.applicant}>
-            <Text style={styles.applicantCaption}>신청자</Text>
-            <View style={styles.applicantHead}>
-              <Text style={styles.applicantName}>{d?.applicantName || '-'}</Text>
-              <Text style={styles.applicantRoom}>{[d?.room, d?.seat].filter(Boolean).join(' · ') || '-'}</Text>
-            </View>
-            <View style={styles.applicantDivider} />
-            {[
-              ['연락처', [d?.phone1, d?.phone2, d?.phone3].filter(Boolean).join('-')],
-              ['최대 종료일', d?.maxEndDate],
-            ].map(([label, value]) => (
-              <View key={label} style={styles.applicantRow}>
-                <Text style={styles.applicantLabel}>{label}</Text>
-                <Text style={styles.applicantValue}>{value || '-'}</Text>
-              </View>
-            ))}
-          </View>
+          {/* 신청자 정보: 기숙사 사이트 표 스타일 */}
+          <Text style={styles.sectionTitle}>신청자 정보</Text>
+          <InfoTable
+            rows={[
+              [
+                ['신청자', d?.applicantName],
+                ['호실', [d?.room, d?.seat].filter(Boolean).join(' ')],
+              ],
+              [['연락처', [d?.phone1, d?.phone2, d?.phone3].filter(Boolean).join('-')]],
+              [['최대 종료일', d?.maxEndDate]],
+            ]}
+          />
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>기간 선택</Text>
 
           <DateRangeCalendar
             start={start}
@@ -257,21 +250,7 @@ const styles = StyleSheet.create({
   cardNo: { color: '#939c98', fontSize: font.xs },
   period: { fontSize: 15, fontWeight: '700', color: colors.text },
   chev: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' },
-  detailPeriod: { fontSize: 19, fontWeight: '800', color: colors.text, marginBottom: 16 },
-  infoList: { borderWidth: 1, borderColor: '#e6ebe9', borderRadius: 16, overflow: 'hidden' },
-  infoRow: { minHeight: 46, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  infoLabel: { color: '#89928f', fontSize: font.sm },
-  infoValue: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
-  memoLabel: { marginTop: 18, marginBottom: 6, fontSize: font.sm, fontWeight: '700', color: '#53605b' },
-  memo: { fontSize: font.base, lineHeight: 22, color: colors.textBody },
-  applicant: { marginBottom: 18, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: '#fafbfb' },
-  applicantCaption: { fontSize: font.xs, fontWeight: '600', color: colors.textMuted },
-  applicantHead: { marginTop: 4, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 },
-  applicantName: { fontSize: 19, fontWeight: '800', color: colors.text },
-  applicantRoom: { flexShrink: 1, textAlign: 'right', fontSize: font.base, fontWeight: '600', color: colors.textBody },
-  applicantDivider: { height: 1, marginVertical: 13, backgroundColor: colors.borderLight },
-  applicantRow: { paddingVertical: 3, flexDirection: 'row', justifyContent: 'space-between' },
-  applicantLabel: { fontSize: font.md, color: colors.textMuted },
-  applicantValue: { fontSize: font.md, fontWeight: '700', color: colors.text },
+  detailTop: { marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { marginBottom: 10, fontSize: font.base, fontWeight: '800', color: colors.text },
   rangeInfo: { marginTop: 8, color: colors.primaryDark, fontSize: font.sm, fontWeight: '600' },
 });

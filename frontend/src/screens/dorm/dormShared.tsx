@@ -106,12 +106,69 @@ export function Pager({
   );
 }
 
+/**
+ * 간단 페이지네이션: 첫 페이지는 '1 >', 중간은 '< 2 >', 마지막은 '< 3'
+ * (번호 묶음 Pager는 묶음 개수를 뒤에서 채우느라 번호가 늘어나 보여서, 현재 페이지만 보여주는 방식)
+ */
+export function SimplePager({ page, hasNext, loading, onChange }: { page: number; hasNext: boolean; loading?: boolean; onChange: (p: number) => void }) {
+  if (page === 0 && !hasNext) return null;
+  return (
+    <View style={styles.pager}>
+      <Pressable
+        style={[styles.pagerArrow, page === 0 && styles.pagerHidden]}
+        disabled={page === 0 || loading}
+        onPress={() => onChange(page - 1)}
+        hitSlop={8}
+        accessibilityLabel="이전 페이지"
+      >
+        <Icon name="back" size={17} color={colors.text} />
+      </Pressable>
+      <View style={styles.pagerNum}>
+        <Text style={[styles.pagerNumText, styles.pagerNumTextActive]}>{page + 1}</Text>
+      </View>
+      <Pressable
+        style={[styles.pagerArrow, !hasNext && styles.pagerHidden]}
+        disabled={!hasNext || loading}
+        onPress={() => onChange(page + 1)}
+        hitSlop={8}
+        accessibilityLabel="다음 페이지"
+      >
+        <Icon name="chevron" size={17} color={colors.text} />
+      </Pressable>
+    </View>
+  );
+}
+
 /** 외박/장기비움 목록: 서버와 같은 10개씩 */
 export const LEAVE_PAGE_SIZE = 10;
 
 /** 게시판(고쳐주세요/공지/일반문의): 사이트는 15개씩 주지만 폰 한 화면에 들어오게 8개씩 보여줌 */
 export const DORM_SERVER_PAGE_SIZE = 15;
 export const DORM_UI_PAGE_SIZE = 8;
+
+/** 기숙사 사이트 표 스타일: 하늘색 라벨 칸 + 흰 값 칸. 한 줄에 1쌍 또는 짧은 값이면 2쌍 */
+export type InfoCell = [label: string, value: ReactNode];
+
+export function InfoTable({ rows }: { rows: InfoCell[][] }) {
+  return (
+    <View style={styles.table}>
+      {rows.map((cells, r) => (
+        <View key={r} style={[styles.tableRow, r < rows.length - 1 && styles.tableRowGap]}>
+          {cells.map(([label, value], c) => (
+            <View key={label} style={[styles.tableCell, c > 0 && styles.tableCellGap]}>
+              <View style={[styles.tableLabel, cells.length > 1 && styles.tableLabelNarrow]}>
+                <Text style={styles.tableLabelText}>{label}</Text>
+              </View>
+              <View style={styles.tableValue}>
+                {typeof value === 'string' || value == null ? <Text style={styles.tableValueText}>{value || '-'}</Text> : value}
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /** 상세 화면 공통 레이아웃 (제목 / 메타 / 본문) */
 export function DetailHeader({ title, meta }: { title: string; meta: string[] }) {
@@ -140,9 +197,20 @@ const styles = StyleSheet.create({
   pager: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   pagerArrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   pagerDisabled: { opacity: 0.2 },
+  pagerHidden: { opacity: 0 },
   pagerNum: { minWidth: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   pagerNumText: { fontSize: font.base, fontWeight: '500', color: colors.textFaint },
   pagerNumTextActive: { fontWeight: '800', color: colors.primaryDark },
+  table: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#d9e7ee' },
+  tableRow: { flexDirection: 'row' },
+  tableRowGap: { borderBottomWidth: 1, borderBottomColor: 'white' },
+  tableCell: { flex: 1, flexDirection: 'row' },
+  tableCellGap: { borderLeftWidth: 1, borderLeftColor: 'white' },
+  tableLabel: { width: 92, paddingHorizontal: 12, paddingVertical: 14, justifyContent: 'center', backgroundColor: '#edf8fc' },
+  tableLabelNarrow: { width: 70, paddingHorizontal: 10 },
+  tableLabelText: { fontSize: font.sm, color: '#4f6570' },
+  tableValue: { flex: 1, paddingHorizontal: 12, paddingVertical: 14, justifyContent: 'center', backgroundColor: 'white' },
+  tableValueText: { fontSize: font.md, lineHeight: 20, color: colors.text },
   detailHead: { paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   detailTitle: { fontSize: 19, fontWeight: '800', color: colors.text, lineHeight: 26 },
   detailMeta: { marginTop: 7, color: colors.textMuted, fontSize: font.xs },

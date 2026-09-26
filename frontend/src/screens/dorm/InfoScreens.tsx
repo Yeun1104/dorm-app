@@ -67,8 +67,10 @@ export function SpointScreen(_: ScreenProps<'Spoint'>) {
 
 // ───────── 입사신청/선발내역 ─────────
 
-/** 룸메이트 칸: '확정'이면 강조색, 그 외(미확정/대기 등)는 회색 */
-const roommateConfirmed = (info: string) => /확정/.test(info) && !/미확정|불/.test(info);
+/** 룸메이트 칸: '확정/배정완료'면 강조색, 그 외(미확정/대기 등)는 회색 */
+const roommateConfirmed = (info: string) => /확정|배정완료/.test(info) && !/미확정|불/.test(info);
+/** 배지엔 핵심만: '비신청 [배정완료]' → '배정완료', 괄호가 없으면 원문 */
+const roommateShort = (info: string) => info.match(/\[([^\]]+)\]/)?.[1]?.trim() || info;
 
 export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
   const { data, error, loading, refreshing, reload, refresh } = useFetch(() => ipsaApi.list(), []);
@@ -78,14 +80,14 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <Chip label={item.selectionStatus || '-'} tone={dormStatusTone(item.selectionStatus)} />
-          <Text style={styles.ipsaTitle} numberOfLines={1}>{item.recruitType}</Text>
+          <Text style={styles.ipsaTitle} numberOfLines={2}>{item.recruitType}</Text>
         </View>
         <Text style={styles.ipsaMeta}>거주기간 {item.residencePeriod || '-'}</Text>
       </View>
       {!!item.roommateInfo && (
         <View style={[styles.roommate, roommateConfirmed(item.roommateInfo) && styles.roommateOn]}>
           <Text style={styles.roommateLabel}>룸메이트</Text>
-          <Text style={[styles.roommateValue, roommateConfirmed(item.roommateInfo) && styles.roommateValueOn]} numberOfLines={1}>{item.roommateInfo}</Text>
+          <Text style={[styles.roommateValue, roommateConfirmed(item.roommateInfo) && styles.roommateValueOn]} numberOfLines={1}>{roommateShort(item.roommateInfo)}</Text>
         </View>
       )}
       <Icon name="chevron" size={18} color="#9aa29f" />
@@ -132,13 +134,10 @@ const IPSA_SECTIONS: { title: string; keys: string[] }[] = [
 /** 위쪽 요약 카드에서 쓰는 라벨 */
 const IPSA_SUMMARY_KEYS = ['모집구분', '배정호실', '인실구분', '사용기간', '입사기간', '세부금액'];
 
-/** '합계: 1,482,400원 = 생활관비: 1,482,400원' → { total: '1,482,400원', detail: '생활관비 1,482,400원' } */
+/** '합계: 1,482,400원 = 생활관비: 1,482,400원' → { total: '1,482,400원' } (합계를 못 찾으면 원문) */
 function parseAmount(v: string | undefined) {
   if (!v) return null;
-  const total = v.match(/합계\s*:?\s*([\d,]+\s*원)/)?.[1];
-  if (!total) return { total: v, detail: null };
-  const detail = v.split('=').slice(1).join('=').replace(/\s*:\s*/g, ' ').trim();
-  return { total, detail: detail || null };
+  return { total: v.match(/합계\s*:?\s*([\d,]+\s*원)/)?.[1] ?? v };
 }
 
 export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
@@ -153,7 +152,6 @@ export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
     { title: '기타', rows: Object.entries(fields).filter(([k]) => !known.has(k)) },
   ].filter((sec) => sec.rows.length > 0);
   const amount = parseAmount(get('세부금액'));
-  const paid = get('입금여부');
 
   return (
     <Screen bg={colors.bgSub}>
@@ -191,12 +189,8 @@ export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
             )}
             {amount && (
               <View style={styles.ipsaAmount}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ipsaAmountLabel}>생활관비</Text>
-                  {!!amount.detail && <Text style={styles.ipsaAmountDetail}>{amount.detail}</Text>}
-                </View>
+                <Text style={styles.ipsaAmountLabel}>생활관비</Text>
                 <Text style={styles.ipsaAmountValue}>{amount.total}</Text>
-                {!!paid && <Chip label={paid} tone={/미/.test(paid) ? 'danger' : 'primary'} />}
               </View>
             )}
           </View>
@@ -419,10 +413,10 @@ const styles = StyleSheet.create({
   ipsaMeta: { fontSize: font.xs, color: colors.textMuted },
   ipsaNotice: { marginBottom: 14, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, backgroundColor: '#eef2f1' },
   ipsaNoticeText: { flex: 1, fontSize: font.sm, lineHeight: 19, color: colors.textBody },
-  roommate: { maxWidth: 110, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', borderRadius: 12, backgroundColor: '#f1f3f2' },
+  roommate: { maxWidth: 84, paddingHorizontal: 9, paddingVertical: 6, alignItems: 'center', borderRadius: 11, backgroundColor: '#f1f3f2' },
   roommateOn: { backgroundColor: colors.primarySoft2 },
   roommateLabel: { fontSize: 10, color: colors.textMuted },
-  roommateValue: { marginTop: 1, fontSize: font.sm, fontWeight: '700', color: colors.textBody },
+  roommateValue: { marginTop: 1, fontSize: font.xs, fontWeight: '700', color: colors.textBody },
   roommateValueOn: { color: colors.primaryDeep },
   ipsaHero: { padding: 20, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
   ipsaHeroCaption: { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },
@@ -433,9 +427,8 @@ const styles = StyleSheet.create({
   ipsaDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   ipsaDateLabel: { width: 52, fontSize: font.sm, color: colors.textMuted },
   ipsaDateValue: { fontSize: font.sm, fontWeight: '700', color: colors.primaryDeep },
-  ipsaAmount: { marginTop: 16, paddingTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: colors.borderLight },
-  ipsaAmountLabel: { fontSize: font.sm, color: colors.textMuted },
-  ipsaAmountDetail: { marginTop: 2, fontSize: font.xs, color: colors.textFaint },
+  ipsaAmount: { marginTop: 16, paddingTop: 14, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  ipsaAmountLabel: { fontSize: font.md, color: colors.textMuted },
   ipsaAmountValue: { fontSize: 18, fontWeight: '800', color: colors.text },
   ipsaSectionTitle: { marginBottom: 8, marginLeft: 4, fontSize: font.md, fontWeight: '800', color: colors.text },
   ipsaList: { paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
