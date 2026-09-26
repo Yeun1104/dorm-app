@@ -201,10 +201,15 @@ export function LeaveFormScreen({ navigation, route }: ScreenProps<'LeaveForm'>)
         <ErrorView message={defaults.error} onRetry={defaults.reload} />
       ) : (
         <FormScroll footer={<Button label="제출" onPress={submit} loading={submitting} />}>
+          {/* 신청자 정보: 이름·호실을 크게, 연락처·최대 종료일은 아래 줄로 */}
           <View style={styles.applicant}>
+            <Text style={styles.applicantCaption}>신청자</Text>
+            <View style={styles.applicantHead}>
+              <Text style={styles.applicantName}>{d?.applicantName || '-'}</Text>
+              <Text style={styles.applicantRoom}>{[d?.room, d?.seat].filter(Boolean).join(' · ') || '-'}</Text>
+            </View>
+            <View style={styles.applicantDivider} />
             {[
-              ['신청자', d?.applicantName],
-              ['호실 · 자리', [d?.room, d?.seat].filter(Boolean).join(' · ')],
               ['연락처', [d?.phone1, d?.phone2, d?.phone3].filter(Boolean).join('-')],
               ['최대 종료일', d?.maxEndDate],
             ].map(([label, value]) => (
@@ -258,9 +263,14 @@ const styles = StyleSheet.create({
   infoValue: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
   memoLabel: { marginTop: 18, marginBottom: 6, fontSize: font.sm, fontWeight: '700', color: '#53605b' },
   memo: { fontSize: font.base, lineHeight: 22, color: colors.textBody },
-  applicant: { marginBottom: 14, padding: 12, borderRadius: 12, backgroundColor: colors.primarySoft2, gap: 5 },
-  applicantRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  applicantLabel: { color: colors.primaryDark, fontSize: font.xs },
-  applicantValue: { color: colors.primaryDeep, fontSize: font.sm, fontWeight: '700' },
+  applicant: { marginBottom: 18, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: '#fafbfb' },
+  applicantCaption: { fontSize: font.xs, fontWeight: '600', color: colors.textMuted },
+  applicantHead: { marginTop: 4, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 },
+  applicantName: { fontSize: 19, fontWeight: '800', color: colors.text },
+  applicantRoom: { flexShrink: 1, textAlign: 'right', fontSize: font.base, fontWeight: '600', color: colors.textBody },
+  applicantDivider: { height: 1, marginVertical: 13, backgroundColor: colors.borderLight },
+  applicantRow: { paddingVertical: 3, flexDirection: 'row', justifyContent: 'space-between' },
+  applicantLabel: { fontSize: font.md, color: colors.textMuted },
+  applicantValue: { fontSize: font.md, fontWeight: '700', color: colors.text },
   rangeInfo: { marginTop: 8, color: colors.primaryDark, fontSize: font.sm, fontWeight: '600' },
 });
