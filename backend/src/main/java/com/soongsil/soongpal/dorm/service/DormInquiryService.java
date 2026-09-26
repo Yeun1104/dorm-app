@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
  * - 방문허용 항목이 없고
  * - 대신 비밀글(secret) 기능이 있음: 남이 쓴 비밀글은 못 열어보고, 상세조회하면 비밀번호 입력 페이지로 대체됨
  *   → 우리는 그 경우 locked=true만 내려주고 구체적인 내용은 아예 시도하지 않음 (본인 글이면 그냥 보임).
+ * - 운영사무실이 댓글로 답변을 다는 기능이 있어서, 상세조회에 staffReply로 그 답변 내용을 같이 내려줌
+ *   (고쳐주세요 게시판엔 이 댓글 기능 자체가 없어서 해당 없음).
  */
 @Slf4j
 @Service
@@ -58,6 +60,7 @@ public class DormInquiryService {
 
     private static final Pattern DETAIL_NO_PATTERN = Pattern.compile("viewContent\\('\\d+','(\\d+)'\\)");
     private static final Pattern REPLY_COUNT_PATTERN = Pattern.compile("\\((\\d+)\\)");
+    private static final String STAFF_WRITER_MARKER = "운영사무실";
 
     private final DormAccountRepository dormAccountRepository;
     private final DormSessionManager dormSessionManager;
@@ -322,6 +325,7 @@ public class DormInquiryService {
             String viewCountStr = extractLabeledValue(doc, "조회수:");
             String writtenAt = extractLabeledValue(doc, "작성일:");
             String content = extractContent(doc);
+            String staffReply = extractStaffReply(doc);
 
             int viewCount;
             try {
@@ -330,7 +334,7 @@ public class DormInquiryService {
                 viewCount = 0;
             }
 
-            return new InquiryDetailDto(no, false, title, writer, viewCount, writtenAt, content);
+            return new InquiryDetailDto(no, false, title, writer, viewCount, writtenAt, content, staffReply);
         } catch (Exception e) {
             log.error("일반문의 상세 파싱 실패 (no={})", no, e);
             throw new DormException(DormErrorCode.DORM_PARSING_FAILED, e);
@@ -366,6 +370,37 @@ public class DormInquiryService {
     private String extractContent(Document doc) {
         Element contentTd = doc.selectFirst("td.descript");
         return contentTd != null ? contentTd.text().trim() : "";
+    }
+
+    /**
+     * 운영사무실 답변은 댓글 영역에서 "작성자" 셀(class=board_reply)에 '운영사무실'이라고 적힌 행을 찾아서,
+     * 같은 행의 내용 셀(class=board)을 답변 텍스트로 가져옴. 답변이 여러 개면 줄바꿈 두 번으로 이어붙임.
+     * 답변이 아예 없으면 null.
+     */
+    private String extractStaffReply(Document doc) {
+        StringBuilder result = new StringBuilder();
+        for (Element writerTd : doc.select("td.board_reply")) {
+            if (!writerTd.text().contains(STAFF_WRITER_MARKER)) {
+                continue;
+            }
+            Element row = writerTd.closest("tr");
+            if (row == null) {
+                continue;
+            }
+            Element contentTd = row.selectFirst("td.board");
+            if (contentTd == null) {
+                continue;
+            }
+            String text = contentTd.text().trim();
+            if (text.isEmpty()) {
+                continue;
+            }
+            if (!result.isEmpty()) {
+                result.append("\n\n");
+            }
+            result.append(text);
+        }
+        return result.isEmpty() ? null : result.toString();
     }
 
     private Long extractDetailNo(String hrefAttr) {
