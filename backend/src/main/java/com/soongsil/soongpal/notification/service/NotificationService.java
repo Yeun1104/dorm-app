@@ -74,6 +74,13 @@ public class NotificationService {
                 .orElse(true); // 설정 만든 적 없으면 기본 허용
     }
 
+    /** 기숙사 공지사항 알림 스케줄러가, 알림 대상을 (기숙사계정 연동 + 이 설정 켜짐)으로 거를 때 참고하는 용도. */
+    public boolean isDormNoticeEnabled(Long userId) {
+        return preferenceRepository.findByUserId(userId)
+                .map(NotificationPreference::isDormNoticeEnabled)
+                .orElse(true); // 설정 만든 적 없으면 기본 허용
+    }
+
     private boolean isCategoryEnabled(Long userId, NotificationType type) {
         NotificationPreference pref = preferenceRepository.findByUserId(userId).orElse(null);
         if (pref == null) {

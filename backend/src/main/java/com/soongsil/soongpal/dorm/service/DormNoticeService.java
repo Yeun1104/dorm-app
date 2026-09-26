@@ -10,11 +10,14 @@ import com.soongsil.soongpal.dorm.dto.NoticeListItemDto;
 import com.soongsil.soongpal.dorm.repository.DormAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
@@ -27,6 +30,9 @@ import java.util.regex.Pattern;
  *
  * ⚠️ 다른 게시판들과 달리 viewform이 B0001_noticeboard_list / B0001_noticeboard_view 로 다름
  * (고쳐주세요/일반문의는 B0001_board_list / B0001_board_view).
+ *
+ * 공지사항은 ssudorm에서 로그인 없이도 볼 수 있는 페이지라, getPublicList()는 특정 사용자 계정으로
+ * 로그인하지 않고 그냥 익명으로 조회함 (알림 스케줄러가 "새 글 있는지"만 가볍게 확인할 때 씀).
  */
 @Slf4j
 @Service
@@ -43,6 +49,9 @@ public class DormNoticeService {
             "/SShostel/mall_main.php?viewform=B0001_noticeboard_view&formpath=&board_type=&next=0&board_no=" + BOARD_NO + "&no=%d&Q=&W=";
 
     private static final Pattern DETAIL_NO_PATTERN = Pattern.compile("viewContent\\('\\d+','(\\d+)'\\)");
+
+    @Value("${dorm.base-url}")
+    private String baseUrl;
 
     private final DormAccountRepository dormAccountRepository;
     private final DormSessionManager dormSessionManager;
@@ -66,6 +75,23 @@ public class DormNoticeService {
                 userId, path, dormAccount.getDormUsername(), dormAccount.getDormPassword());
 
         return parseList(doc);
+    }
+
+    /**
+     * 로그인 없이 최신 공지 1페이지(15건)를 가져옴. 특정 사용자 계정이 필요 없어서
+     * "새 공지 있는지"만 주기적으로 확인하는 알림 스케줄러가 이걸 씀 (계정당 로그인 반복 안 해도 됨).
+     */
+    public List<NoticeListItemDto> getPublicList() {
+        try {
+            String path = String.format(LIST_PATH_TEMPLATE, 0);
+            Document doc = Jsoup.connect(baseUrl + path)
+                    .timeout(10_000)
+                    .get();
+            return parseList(doc);
+        } catch (IOException e) {
+            log.error("공지사항 공개 목록 조회 실패", e);
+            throw new DormException(DormErrorCode.DORM_CONNECTION_FAILED, e);
+        }
     }
 
     public NoticeDetailDto getDetail(Long userId, long no) {
