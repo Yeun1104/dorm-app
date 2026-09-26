@@ -24,7 +24,7 @@ import { useFetch } from '../../hooks/useFetch';
 import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
-import { BoardRow, DetailHeader, detailStyles, DORM_SERVER_PAGE_SIZE, DORM_UI_PAGE_SIZE, Pager } from './dormShared';
+import { BoardRow, DetailHeader, detailStyles, DORM_SERVER_PAGE_SIZE, DORM_UI_PAGE_SIZE, SimplePager } from './dormShared';
 
 type Kind = 'repair' | 'notice' | 'inquiry';
 type Item = RepairListItem | NoticeListItem | InquiryListItem;
@@ -109,7 +109,7 @@ function DormBoardList({ kind, onOpen, onWrite }: { kind: Kind; onOpen: (no: num
           refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.refresh} tintColor={colors.primary} />}
           ListEmptyComponent={<EmptyState icon="doc" title={query.keyword ? '검색 결과가 없어요' : META[kind].empty} />}
           ListFooterComponent={
-            <Pager page={list.page} pagesInBlock={list.pagesInBlock} hasNextBlock={list.hasNextBlock} loading={list.loading} onChange={list.goTo} />
+            <SimplePager page={list.page} hasNext={list.hasNext} loading={list.loading} onChange={list.goTo} />
           }
         />
       )}

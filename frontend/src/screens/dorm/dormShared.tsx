@@ -106,6 +106,39 @@ export function Pager({
   );
 }
 
+/**
+ * 간단 페이지네이션: 첫 페이지는 '1 >', 중간은 '< 2 >', 마지막은 '< 3'
+ * (번호 묶음 Pager는 묶음 개수를 뒤에서 채우느라 번호가 늘어나 보여서, 현재 페이지만 보여주는 방식)
+ */
+export function SimplePager({ page, hasNext, loading, onChange }: { page: number; hasNext: boolean; loading?: boolean; onChange: (p: number) => void }) {
+  if (page === 0 && !hasNext) return null;
+  return (
+    <View style={styles.pager}>
+      <Pressable
+        style={[styles.pagerArrow, page === 0 && styles.pagerHidden]}
+        disabled={page === 0 || loading}
+        onPress={() => onChange(page - 1)}
+        hitSlop={8}
+        accessibilityLabel="이전 페이지"
+      >
+        <Icon name="back" size={17} color={colors.text} />
+      </Pressable>
+      <View style={styles.pagerNum}>
+        <Text style={[styles.pagerNumText, styles.pagerNumTextActive]}>{page + 1}</Text>
+      </View>
+      <Pressable
+        style={[styles.pagerArrow, !hasNext && styles.pagerHidden]}
+        disabled={!hasNext || loading}
+        onPress={() => onChange(page + 1)}
+        hitSlop={8}
+        accessibilityLabel="다음 페이지"
+      >
+        <Icon name="chevron" size={17} color={colors.text} />
+      </Pressable>
+    </View>
+  );
+}
+
 /** 외박/장기비움 목록: 서버와 같은 10개씩 */
 export const LEAVE_PAGE_SIZE = 10;
 
@@ -164,6 +197,7 @@ const styles = StyleSheet.create({
   pager: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   pagerArrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   pagerDisabled: { opacity: 0.2 },
+  pagerHidden: { opacity: 0 },
   pagerNum: { minWidth: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   pagerNumText: { fontSize: font.base, fontWeight: '500', color: colors.textFaint },
   pagerNumTextActive: { fontWeight: '800', color: colors.primaryDark },

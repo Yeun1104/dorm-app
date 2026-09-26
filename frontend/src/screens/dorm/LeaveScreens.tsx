@@ -12,7 +12,7 @@ import { useSlicedPages } from '../../hooks/useSlicedPages';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { daysBetween, parseLocalDate, toLocalDateString } from '../../utils/format';
-import { dormStatusTone, InfoTable, LEAVE_PAGE_SIZE, Pager } from './dormShared';
+import { dormStatusTone, InfoTable, LEAVE_PAGE_SIZE, SimplePager } from './dormShared';
 
 const TEXT: Record<LeaveKind, { title: string; subtitle: string; guideTitle: string; guide: string }> = {
   outing: {
@@ -91,7 +91,7 @@ export function LeaveListScreen({ navigation, route }: ScreenProps<'LeaveList'>)
             </View>
           }
           ListEmptyComponent={<EmptyState icon="calendar" title="신청 내역이 없어요" />}
-          ListFooterComponent={<Pager page={list.page} pagesInBlock={list.pagesInBlock} hasNextBlock={list.hasNextBlock} loading={list.loading} onChange={list.goTo} />}
+          ListFooterComponent={<SimplePager page={list.page} hasNext={list.hasNext} loading={list.loading} onChange={list.goTo} />}
         />
       )}
       <Fab label="신청하기" onPress={() => navigation.navigate('LeaveForm', { kind })} />

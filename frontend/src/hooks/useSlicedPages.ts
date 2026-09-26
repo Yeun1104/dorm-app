@@ -12,11 +12,19 @@ export const PAGE_BLOCK = 5;
  * 2) 이어서 같은 묶음의 나머지(+다음 묶음 존재 여부 확인용 1개)를 뒤에서 받아 번호 개수를 채움
  * - 받은 서버 페이지는 캐시. deps(검색어 등)가 바뀌거나 화면에 다시 들어오면 캐시를 비움
  */
-export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]>, serverSize: number, uiSize: number, deps: DependencyList) {
+export function useSlicedPages<T>(
+  fetchPage: (serverPage: number) => Promise<T[]>,
+  serverSize: number,
+  uiSize: number,
+  deps: DependencyList,
+  /** true면 번호 묶음(1~5) 개수까지 뒤에서 채움. false면 현재 페이지 + 다음 존재 여부만 (SimplePager용) */
+  countBlock = false,
+) {
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<T[] | null>(null);
   const [pagesInBlock, setPagesInBlock] = useState(1);
   const [hasNextBlock, setHasNextBlock] = useState(false);
+  const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +76,7 @@ export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]
         await fillUntil(start + uiSize + 1);
         if (id !== reqId.current) return;
         setItems(collected.slice(start - base, start - base + uiSize));
+        setHasNext(collected.length > start - base + uiSize);
         setPage(uiPage);
         apply();
         setError(null);
@@ -82,6 +91,7 @@ export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]
       }
 
       // 2) 같은 묶음의 나머지는 뒤에서 (번호 개수·다음 묶음 여부)
+      if (!countBlock) return;
       try {
         await fillUntil(blockStart + blockSize + 1);
         if (id === reqId.current) apply();
@@ -89,7 +99,7 @@ export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]
         // 번호 채우기 실패는 조용히 무시 (지금 페이지는 이미 표시됨)
       }
     },
-    [serverPage, serverSize, uiSize],
+    [serverPage, serverSize, uiSize, countBlock],
   );
 
   // 조건이 바뀌면 처음부터
@@ -119,6 +129,8 @@ export function useSlicedPages<T>(fetchPage: (serverPage: number) => Promise<T[]
     /** 현재 번호 묶음(1~5 등)에 실제로 있는 페이지 수 */
     pagesInBlock,
     hasNextBlock,
+    /** 현재 페이지 다음 페이지가 있는지 */
+    hasNext,
     loading,
     refreshing,
     error,
