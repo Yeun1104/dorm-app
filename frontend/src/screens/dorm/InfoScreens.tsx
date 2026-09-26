@@ -119,29 +119,58 @@ export function IpsaListScreen({ navigation }: ScreenProps<'IpsaList'>) {
   );
 }
 
+/** 상세 필드 중 위쪽 요약 카드로 뺄 항목 (사이트 라벨이 건마다 조금씩 달라 키워드로 찾음) */
+const STATUS_KEY = /선발|합격|결과|상태/;
+const PERIOD_KEY = /기간/;
+/** 값이 이보다 길면 타일을 한 줄 전체로 */
+const LONG_VALUE = 14;
+
 export function IpsaDetailScreen({ route }: ScreenProps<'IpsaDetail'>) {
   const { mozipCode, title } = route.params;
   const { data, error, loading, reload } = useFetch(() => ipsaApi.detail(mozipCode), [mozipCode]);
-  // 필드 구성이 건마다 다를 수 있어 고정 레이아웃 대신 fields 맵을 순서대로 렌더링
-  const entries = Object.entries(data?.fields ?? {});
+  // 필드 구성이 건마다 달라 고정 레이아웃 대신 라벨→값 맵을 순서대로 씀. 빈 값은 생략
+  const entries = Object.entries(data?.fields ?? {}).filter(([, v]) => v && v.trim() && v.trim() !== '-');
+  const status = entries.find(([k]) => STATUS_KEY.test(k));
+  const period = entries.find(([k]) => PERIOD_KEY.test(k));
+  const rest = entries.filter((e) => e !== status && e !== period);
+
   return (
-    <Screen bg="white">
-      <SubHeader title="선발내역 상세" subtitle={title} />
+    <Screen bg={colors.bgSub}>
+      <SubHeader title="선발내역 상세" />
       {loading && !data ? (
         <LoadingView />
       ) : error || !data ? (
         <ErrorView message={error ?? '불러오지 못했어요'} onRetry={reload} />
+      ) : entries.length === 0 ? (
+        <EmptyState icon="doc" title="표시할 정보가 없어요" />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-          <View style={styles.fieldTable}>
-            {entries.map(([label, value], i) => (
-              <View key={label} style={[styles.fieldRow, i < entries.length - 1 && styles.fieldDivider]}>
-                <Text style={styles.fieldLabel}>{label}</Text>
-                <Text style={styles.fieldValue}>{value || '-'}</Text>
+        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+          {/* 요약: 모집구분 · 선발 결과 · 거주기간 */}
+          <View style={styles.ipsaHero}>
+            <View style={styles.ipsaHeroTop}>
+              <Text style={styles.ipsaHeroTitle} numberOfLines={2}>{title}</Text>
+              {status && <Chip label={status[1]} tone={dormStatusTone(status[1])} large />}
+            </View>
+            {period && (
+              <View style={styles.ipsaPeriod}>
+                <Icon name="calendar" size={15} color={colors.primaryDeep} />
+                <Text style={styles.ipsaPeriodLabel}>{period[0]}</Text>
+                <Text style={styles.ipsaPeriodValue} numberOfLines={1}>{period[1]}</Text>
               </View>
-            ))}
+            )}
           </View>
-          {entries.length === 0 && <EmptyState icon="doc" title="표시할 정보가 없어요" />}
+
+          {/* 나머지 항목: 2열 타일, 긴 값은 한 줄 전체 */}
+          {rest.length > 0 && (
+            <View style={styles.tiles}>
+              {rest.map(([label, value]) => (
+                <View key={label} style={[styles.tile, value.length > LONG_VALUE && styles.tileWide]}>
+                  <Text style={styles.tileLabel} numberOfLines={1}>{label}</Text>
+                  <Text style={styles.tileValue}>{value}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </Screen>
@@ -352,11 +381,17 @@ const styles = StyleSheet.create({
   roommateLabel: { fontSize: 10, color: colors.textMuted },
   roommateValue: { marginTop: 1, fontSize: font.sm, fontWeight: '700', color: colors.textBody },
   roommateValueOn: { color: colors.primaryDeep },
-  fieldTable: { borderWidth: 1, borderColor: '#e6ebe9', borderRadius: 16, overflow: 'hidden' },
-  fieldRow: { paddingHorizontal: 14, paddingVertical: 13, flexDirection: 'row', gap: 12 },
-  fieldDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  fieldLabel: { width: 100, color: '#89928f', fontSize: font.sm },
-  fieldValue: { flex: 1, color: colors.text, fontSize: font.sm, fontWeight: '600' },
+  ipsaHero: { padding: 18, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
+  ipsaHeroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  ipsaHeroTitle: { flex: 1, fontSize: 18, lineHeight: 24, fontWeight: '800', color: colors.text },
+  ipsaPeriod: { marginTop: 14, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, backgroundColor: colors.primarySoft2 },
+  ipsaPeriodLabel: { fontSize: font.xs, fontWeight: '700', color: colors.primaryDeep },
+  ipsaPeriodValue: { flex: 1, textAlign: 'right', fontSize: font.sm, fontWeight: '700', color: colors.primaryDeep },
+  tiles: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  tile: { width: '48.5%', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: 'white' },
+  tileWide: { width: '100%' },
+  tileLabel: { fontSize: font.xs, color: colors.textMuted },
+  tileValue: { marginTop: 4, fontSize: font.md, lineHeight: 20, fontWeight: '700', color: colors.text },
 
   weekNav: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   weekBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: '#e1e6e4', backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
