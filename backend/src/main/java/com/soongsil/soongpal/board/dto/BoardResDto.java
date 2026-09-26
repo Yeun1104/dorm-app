@@ -23,6 +23,7 @@ public class BoardResDto {
     private Integer unitPrice;       // 자동 계산 (올림)
     private Integer remainingQuantity; // 자동 계산 (totalQuantity - 예약(ACCEPTED/COMPLETED) 합계)
     private Integer waitingCount;      // 방장 수락 대기중인 참여요청(PENDING) 건수 — 프론트 FOMO 문구용
+    private Integer participantCount;  // 실제 참여 확정된(ACCEPTED/COMPLETED) 서로 다른 사람 수 — 공개 카운트
 
     private String url;
     private String location;
@@ -37,7 +38,8 @@ public class BoardResDto {
     private Integer likeCount;
     private boolean liked;
 
-    public static BoardResDto from(Board board, Integer likeCount, boolean liked, Integer remainingQuantity, Integer waitingCount) {
+    public static BoardResDto from(Board board, Integer likeCount, boolean liked, Integer remainingQuantity,
+                                    Integer waitingCount, Integer participantCount) {
         return BoardResDto.builder()
                 .id(board.getId())
                 .title(board.getTitle())
@@ -48,6 +50,7 @@ public class BoardResDto {
                 .unitPrice(board.getUnitPrice())
                 .remainingQuantity(remainingQuantity)
                 .waitingCount(waitingCount)
+                .participantCount(participantCount)
                 .url(board.getUrl())
                 .location(board.getLocation())
                 .category(board.getCategory())

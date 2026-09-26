@@ -81,7 +81,7 @@ public class BoardService {
 
         // ⚠️ 예전엔 여기서 GROUP 카테고리면 단체채팅방을 자동으로 열었는데, 이제 공동구매도 1:1 채팅만 쓰기로 해서
         // 글쓰기 시점엔 채팅방을 안 만듦. 구매자가 참여요청을 보내고, 방장이 수락해야 1:1 채팅방이 생김.
-        return BoardResDto.from(board, 0, false, savedBoard.getTotalQuantity(), 0);
+        return BoardResDto.from(board, 0, false, savedBoard.getTotalQuantity(), 0, 0);
     }
 
     // ⚠️ open-in-view: false라서, 세션이 열려있는 이 트랜잭션 안에서 board.getUser() 같은 지연로딩 연관관계를
@@ -259,7 +259,8 @@ public class BoardService {
         boolean liked = likeRepository.existsByBoardIdAndUserId(board.getId(), userId);
         Integer remaining = calculateRemainingQuantity(board);
         Integer waitingCount = (int) reservationRepository.countByBoardIdAndStatus(board.getId(), ReservationStatus.PENDING);
-        return BoardResDto.from(board, likeCount, liked, remaining, waitingCount);
+        Integer participantCount = reservationRepository.countDistinctParticipantsByBoardId(board.getId());
+        return BoardResDto.from(board, likeCount, liked, remaining, waitingCount, participantCount);
     }
 
     private Integer calculateRemainingQuantity(Board board) {
