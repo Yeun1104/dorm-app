@@ -62,11 +62,13 @@ public class DevSeedController {
 
         for (int i = 0; i < DUMMY_NICKNAMES.length; i++) {
             String kakaoId = "dev-dummy-" + (i + 1);
+            String nickname = DUMMY_NICKNAMES[i]; // 람다 안에서 쓰려면 effectively final 이어야 해서 루프변수 i 대신 이걸로 캡처
+
             User user = userRepository.findByKakaoId(kakaoId)
                     .orElseGet(() -> userRepository.save(
                             User.builder()
                                     .kakaoId(kakaoId)
-                                    .nickName(DUMMY_NICKNAMES[i])
+                                    .nickName(nickname)
                                     .email(kakaoId + "@dev.local")
                                     .build()
                     ));
