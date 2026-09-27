@@ -61,6 +61,8 @@ public class DormInquiryService {
     private static final Pattern DETAIL_NO_PATTERN = Pattern.compile("viewContent\\('\\d+','(\\d+)'\\)");
     private static final Pattern REPLY_COUNT_PATTERN = Pattern.compile("\\((\\d+)\\)");
     private static final String STAFF_WRITER_MARKER = "운영사무실";
+    // <br>을 진짜 개행문자로 바꿔주기 위한 임시 마커. 실제 글 내용에 나올 일이 없는 사설 유니코드 영역 문자를 씀.
+    private static final String LINE_BREAK_MARKER = "\uE000";
 
     private final DormAccountRepository dormAccountRepository;
     private final DormSessionManager dormSessionManager;
@@ -369,7 +371,7 @@ public class DormInquiryService {
 
     private String extractContent(Document doc) {
         Element contentTd = doc.selectFirst("td.descript");
-        return contentTd != null ? contentTd.text().trim() : "";
+        return htmlToTextPreservingLineBreaks(contentTd);
     }
 
     /**
@@ -391,8 +393,8 @@ public class DormInquiryService {
             if (contentTd == null) {
                 continue;
             }
-            String text = contentTd.text().trim();
-            if (text.isEmpty()) {
+            String text = htmlToTextPreservingLineBreaks(contentTd);
+            if (text == null || text.isEmpty()) {
                 continue;
             }
             if (!result.isEmpty()) {
@@ -401,6 +403,24 @@ public class DormInquiryService {
             result.append(text);
         }
         return result.isEmpty() ? null : result.toString();
+    }
+
+    /**
+     * jsoup의 Element.text()는 <br>을 그냥 공백으로 뭉개버려서 줄바꿈이 다 사라짐.
+     * 그래서 <br> 태그를 실제 개행문자로 바꾸기 전에, 텍스트로 안 쓰일 마커 문자를 먼저 끼워넣고
+     * text()로 뽑아낸 다음 마커를 진짜 "\n"으로 되돌리는 방식으로 줄바꿈을 살림.
+     * 원본 element는 건드리면 안 되니(재사용될 수 있음) clone해서 작업함.
+     */
+    private String htmlToTextPreservingLineBreaks(Element element) {
+        if (element == null) {
+            return "";
+        }
+        Element clone = element.clone();
+        for (Element br : clone.select("br")) {
+            br.after(LINE_BREAK_MARKER);
+        }
+        String text = clone.text();
+        return text.replace(LINE_BREAK_MARKER, "\n").trim();
     }
 
     private Long extractDetailNo(String hrefAttr) {
