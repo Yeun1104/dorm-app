@@ -59,6 +59,12 @@ jwt:
 kakao-admin:
   key: ${KAKAO_ADMIN_KEY:dummy-admin-key}
 
+# ===== 디스코드 웹훅 (신고 접수 알림) =====
+# 값을 안 넣으면(빈 문자열이면) 그냥 조용히 알림을 안 보냄 - 로컬 개발 시 에러 안 남.
+# 디스코드 채널 설정 > 연동 > 웹후크에서 URL 발급받아 DISCORD_REPORT_WEBHOOK_URL 환경변수로 넣으면 됨.
+discord:
+  report-webhook-url: ${DISCORD_REPORT_WEBHOOK_URL:}
+
 # ===== 앱 자체 설정 =====
 app:
   oauth2:
