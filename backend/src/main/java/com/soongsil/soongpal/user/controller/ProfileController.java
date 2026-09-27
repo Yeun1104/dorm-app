@@ -1,6 +1,8 @@
 package com.soongsil.soongpal.user.controller;
 
 import com.soongsil.soongpal.common.dto.CommonResDto;
+import com.soongsil.soongpal.common.exception.UserErrorCode;
+import com.soongsil.soongpal.common.exception.UserException;
 import com.soongsil.soongpal.user.dto.ProfileResDto;
 import com.soongsil.soongpal.user.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,9 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,5 +29,23 @@ public class ProfileController {
     public ResponseEntity<CommonResDto<ProfileResDto>> getProfile(@PathVariable Long userId) {
         ProfileResDto result = profileService.getProfile(userId);
         return new ResponseEntity<>(new CommonResDto<>("프로필 조회 성공", result), HttpStatus.OK);
+    }
+
+    @Operation(summary = "내 프로필 이미지 등록/변경", description = "기존 이미지가 있으면 교체됨(이전 이미지는 S3에서 삭제).")
+    @PostMapping(value = "/api/users/me/profile-image", consumes = "multipart/form-data")
+    public ResponseEntity<CommonResDto<Map<String, String>>> updateMyProfileImage(@RequestParam("image") MultipartFile image) {
+        Long userId = getUserId();
+        String url = profileService.updateMyProfileImage(userId, image);
+        return new ResponseEntity<>(new CommonResDto<>("프로필 이미지가 변경되었습니다.", Map.of("profileImageUrl", url)), HttpStatus.OK);
+    }
+
+    private Long getUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new UserException(UserErrorCode.INVALID_USER_CREDENTIALS);
+        }
+
+        return Long.parseLong(authentication.getName());
     }
 }

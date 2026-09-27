@@ -14,6 +14,7 @@ import java.util.List;
 public class ProfileResDto {
     private Long userId;
     private String nickname;
+    private String profileImageUrl; // 없으면 null — 프론트에서 기본 아바타 이미지로 대체하면 됨
     private boolean schoolVerified; // 학교 계정(usaint) 인증 여부 — 인증 배지 표시용
     private boolean dormVerified;   // 기숙사 계정(ssudorm) 연동 여부 — 인증 배지 표시용
     private int tradeCount; // 구매자로서 완료 + 판매자(작성자)로서 완료한 거래 수 합

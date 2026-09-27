@@ -5,6 +5,7 @@ import com.soongsil.soongpal.board.domain.BoardStatus;
 import com.soongsil.soongpal.board.repository.BoardRepository;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
+import com.soongsil.soongpal.common.file.S3Uploader;
 import com.soongsil.soongpal.dorm.repository.DormAccountRepository;
 import com.soongsil.soongpal.manner.dto.MannerBadgeDto;
 import com.soongsil.soongpal.manner.service.MannerReviewService;
@@ -17,6 +18,7 @@ import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -31,6 +33,7 @@ public class ProfileService {
     private final ReservationRepository reservationRepository;
     private final MannerReviewService mannerReviewService;
     private final DormAccountRepository dormAccountRepository;
+    private final S3Uploader s3Uploader;
 
     @Transactional(readOnly = true)
     public ProfileResDto getProfile(Long targetUserId) {
@@ -59,6 +62,7 @@ public class ProfileService {
         return ProfileResDto.builder()
                 .userId(user.getId())
                 .nickname(user.getNickName())
+                .profileImageUrl(user.getProfileImageUrl())
                 .schoolVerified(user.isSchoolVerified())
                 .dormVerified(dormVerified)
                 .tradeCount((int) (completedAsBuyer + completedAsSeller))
@@ -66,5 +70,23 @@ public class ProfileService {
                 .inProgressBoards(inProgressBoards)
                 .completedBoards(completedBoards)
                 .build();
+    }
+
+    /** 내 프로필 이미지 등록/변경. 기존 이미지가 있으면 S3에서 지우고 새로 올림. */
+    @Transactional
+    public String updateMyProfileImage(Long userId, MultipartFile image) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+
+        String oldUrl = user.getProfileImageUrl();
+
+        String newUrl = s3Uploader.uploadFile(image, "profile");
+        user.updateProfileImageUrl(newUrl);
+
+        if (oldUrl != null) {
+            s3Uploader.deleteFile(oldUrl);
+        }
+
+        return newUrl;
     }
 }
