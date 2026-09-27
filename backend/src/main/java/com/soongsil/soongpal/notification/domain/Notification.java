@@ -36,7 +36,10 @@ public class Notification extends BaseEntity {
     private Long relatedChatRoomId;
     private Long relatedReservationId;
 
-    @Column(nullable = false)
+    // ⚠️ 컬럼명을 반드시 is_read로 지정해야 함 — read는 MySQL 예약어라서(LOCK TABLES ... READ 등에 쓰임)
+    // 컬럼명으로 그대로 쓰면 "SQL syntax error near 'read,...'" 에러가 남 (실제로 이 문제 때문에 참여요청 시
+    // 알림 저장 자체가 통째로 실패하고 있었음). 자바 필드명/getter(isRead())는 그대로 두고 DB 컬럼명만 바꿈.
+    @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
     @Builder
