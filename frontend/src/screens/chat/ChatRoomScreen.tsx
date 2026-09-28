@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '../../api/client';
-import { chatApi, mannerApi, reservationApi } from '../../api/trade';
+import { chatApi, mannerApi, profileApi, reservationApi } from '../../api/trade';
 import type { ChatMessage, Reservation } from '../../api/types';
 import { useMe } from '../../auth/AuthContext';
 import { useChatSocket } from '../../chat/useChatSocket';
@@ -71,6 +71,10 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     [roomId],
     { refetchOnFocus: true },
   );
+
+  // 상대방 프로필 사진: 채팅방 응답의 users[].profileImage가 비어 있어서 프로필 API로 받음
+  const otherUserId = info.data?.room.users.find((u) => u.userId !== me.userId)?.userId ?? null;
+  const otherProfile = useFetch(() => profileApi.get(otherUserId!), [otherUserId], { enabled: otherUserId != null });
 
   // 메시지: 서버가 최신순(desc)으로 주므로 inverted FlatList에 그대로 사용
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -202,6 +206,14 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const { room, board, seller, reservation } = info.data;
   const other = room.users.find((u) => u.userId !== me.userId);
   const readOnly = reservation?.status === 'CANCELLED';
+  // 신고 대상: 방 참여자 목록의 상대 → 없으면(상대가 나간 방 등) 예약/게시글 정보로
+  const reportTarget = other
+    ? { userId: other.userId, nickname: other.userName }
+    : seller && reservation
+      ? { userId: reservation.buyerId, nickname: reservation.buyerNickname }
+      : board && !seller
+        ? { userId: board.authorId, nickname: board.authorNickname }
+        : null;
 
   const setReservation = (r: Reservation) => {
     info.setData((d) => (d ? { ...d, reservation: { ...d.reservation, ...r } } : d));
@@ -284,10 +296,19 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     const older = messages[index + 1];
     const olderDate = older ? parseServerDate(older.createdAt)?.toDateString() : null;
     const showDivider = d && d.toDateString() !== olderDate;
+    // 상대가 연달아 보낸 메시지는 첫 메시지에만 프로필 사진 + 닉네임 (날짜가 바뀌면 다시 표시)
+    const firstOfGroup = !mine && (showDivider || older?.senderId !== item.senderId);
+    const openProfile = () => navigation.navigate('UserProfile', { userId: item.senderId });
     return (
       <View>
         {showDivider && <Text style={styles.divider}>{`${d!.getMonth() + 1}월 ${d!.getDate()}일`}</Text>}
-        <View style={[styles.bubbleRow, mine ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
+        {firstOfGroup && (
+          <Pressable style={styles.senderRow} onPress={openProfile} hitSlop={4}>
+            <Avatar name={item.senderName} uri={otherProfile.data?.profileImageUrl} size={32} />
+            <Text style={styles.senderName}>{item.senderName}</Text>
+          </Pressable>
+        )}
+        <View style={[styles.bubbleRow, mine ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start', paddingLeft: 40 }]}>
           {mine && (
             <View style={styles.bubbleMeta}>
               {(item.unreadCount ?? 0) > 0 && <Text style={styles.unread}>{item.unreadCount}</Text>}
@@ -323,7 +344,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
           <Icon name="back" />
         </Pressable>
         <Pressable style={styles.person} onPress={() => other && navigation.navigate('UserProfile', { userId: other.userId })}>
-          <Avatar name={other?.userName ?? room.name} size={31} />
+          <Avatar name={other?.userName ?? room.name} uri={otherProfile.data?.profileImageUrl} size={31} />
           <View>
             <Text style={styles.personName}>{other?.userName ?? room.name}</Text>
             <Text style={styles.personSub}>
@@ -338,12 +359,12 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
       </View>
       {menu && (
         <View style={styles.menu}>
-          {other && (
+          {!!reportTarget && (
             <Pressable
               style={styles.menuItem}
               onPress={() => {
                 setMenu(false);
-                navigation.navigate('Report', { userId: other.userId, nickname: other.userName, boardId: room.productId });
+                navigation.navigate('Report', { userId: reportTarget.userId, nickname: reportTarget.nickname, boardId: room.productId });
               }}
             >
               <Text style={styles.menuText}>신고하기</Text>
@@ -489,6 +510,8 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: font.base, lineHeight: 20, color: colors.text },
   bubbleTime: { color: '#98a09d', fontSize: 10 },
   bubbleMeta: { alignItems: 'flex-end' },
+  senderRow: { alignSelf: 'flex-start', marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  senderName: { fontSize: font.sm, fontWeight: '600', color: colors.textBody },
   msgMenu: { position: 'absolute', right: 20, minWidth: 120, paddingVertical: 4, borderRadius: 12, backgroundColor: 'white', shadowColor: '#1f414e', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   msgMenuItem: { paddingHorizontal: 16, paddingVertical: 12 },
   msgMenuText: { fontSize: font.md, fontWeight: '600', color: colors.text },
