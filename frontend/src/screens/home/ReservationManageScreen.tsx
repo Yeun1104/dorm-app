@@ -10,6 +10,7 @@ import Icon from '../../components/Icon';
 import { Avatar, ChipTone, EmptyState, ErrorView, LoadingView, PageHeader, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
 import { invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
+import { useWebDragScroll } from '../../hooks/useWebDragScroll';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { won } from '../../utils/format';
@@ -43,7 +44,7 @@ type Selection = 'ALL' | number;
  * 참여 요청 관리
  * - 위: 대기중/수락됨/거절됨 탭 (고정)
  * - 목록 머리: [전체] + 내 모집중 글 카드를 옆으로 넘기며(스냅) 고름. 처음엔 '전체'(모든 글의 요청)
- * - boardId로 들어오면(알림·내가 쓴 글) 그 글 카드부터
+ * - boardId로 들어오면(알림·내가 쓴 글의 '참여 요청 관리') 그 글 하나의 요청 목록만
  */
 export default function ReservationManageScreen({ navigation, route, asTab }: ScreenProps<'ReservationManage'> & { asTab?: boolean }) {
   const toast = useToast();
@@ -53,12 +54,11 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
   const paramId = route.params?.boardId ?? null;
   const [selected, setSelected] = useState<Selection>(paramId ?? 'ALL');
 
-  // 내 모집중 글 + 각 글의 요청을 한 번에 (탭에 들어올 때마다 새로)
+  // 탭: 내 모집중 글 전체 + 각 글의 요청 / 특정 글로 들어오면: 그 글 하나 (들어올 때마다 새로)
   const all = useFetch(
     async () => {
-      const mine = (await userApi.myBoards(0)).boards;
-      const boards = mine.filter((b) => b.status === 'IN_PROGRESS' || b.id === paramId);
-      if (paramId != null && !boards.some((b) => b.id === paramId)) boards.unshift(await boardApi.detail(paramId));
+      const boards =
+        paramId != null ? [await boardApi.detail(paramId)] : (await userApi.myBoards(0)).boards.filter((b) => b.status === 'IN_PROGRESS');
       const lists = await Promise.all(boards.map((b) => reservationApi.listByBoard(b.id)));
       return { boards, reservations: lists.flat() };
     },
@@ -99,8 +99,10 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
     });
     if (!ok) return;
     try {
-      applyUpdate(await reservationApi.updateStatus(r.id, 'ACCEPTED'));
-      toast('수락했어요. 채팅방이 열렸습니다');
+      const updated = await reservationApi.updateStatus(r.id, 'ACCEPTED');
+      applyUpdate(updated);
+      // 수락하면 안내 없이 바로 그 채팅방으로
+      if (updated.chatRoomId != null) navigation.navigate('ChatRoom', { roomId: updated.chatRoomId });
     } catch (e) {
       toast(errorMessage(e));
       all.reload();
@@ -122,11 +124,33 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
   const interval = cardW + CARD_GAP;
   const pages: Selection[] = ['ALL', ...boards.map((b) => b.id)];
   const carousel = useRef<FlatList<Selection>>(null);
+  const drag = useWebDragScroll({
+    scrollTo: (x, animated) => carousel.current?.scrollToOffset({ offset: x, animated }),
+    snap: interval,
+    count: pages.length,
+    onSettle: (i) => setSelected(pages[i]),
+  });
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectIndex = (i: number) => {
     setSelected(pages[i]);
     carousel.current?.scrollToOffset({ offset: i * interval, animated: true });
   };
+
+  // 특정 글로 들어온 경우: 그 글 카드만 (넘기기 없음)
+  const single = paramId != null ? boards[0] : null;
+  const renderSingle = () =>
+    single && (
+      <Pressable style={[styles.pickCard, { marginBottom: 6 }]} onPress={() => navigation.navigate('BoardDetail', { boardId: single.id })}>
+        <Thumb uri={single.images[0]?.imageUrl} size={52} radius={12} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.pickTitle} numberOfLines={1}>{single.title}</Text>
+          <Text style={styles.pickMeta} numberOfLines={1}>
+            대기 {single.waitingCount}건 · {single.remainingQuantity}개 남음 · {won(single.unitPrice)}
+          </Text>
+        </View>
+        <Icon name="chevron" size={17} color={colors.textFaint} />
+      </Pressable>
+    );
 
   const renderCarousel = () => (
     <View style={{ marginBottom: 6 }}>
@@ -137,6 +161,7 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
           <Icon name="chevron" size={13} color={colors.textMuted} />
         </Pressable>
       </View>
+      <View {...drag.panHandlers} style={drag.style}>
       <FlatList
         ref={carousel}
         horizontal
@@ -152,6 +177,7 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
         // 스크롤이 멈추면 가운데 온 카드를 선택 (웹은 momentum 이벤트가 없어서 onScroll + 잠깐 대기로 판단)
         scrollEventThrottle={50}
         onScroll={(e) => {
+          drag.onScroll(e);
           const x = e.nativeEvent.contentOffset.x;
           if (settleTimer.current) clearTimeout(settleTimer.current);
           settleTimer.current = setTimeout(() => {
@@ -192,6 +218,7 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
           );
         }}
       />
+      </View>
       {pages.length > 1 && (
         <View style={styles.dots}>
           {pages.map((p) => (
@@ -214,7 +241,7 @@ export default function ReservationManageScreen({ navigation, route, asTab }: Sc
         keyExtractor={(r) => String(r.id)}
         contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={all.refreshing} onRefresh={all.refresh} tintColor={colors.primary} />}
-        ListHeaderComponent={renderCarousel()}
+        ListHeaderComponent={single ? renderSingle() : renderCarousel()}
         ListEmptyComponent={<EmptyState title={`${{ PENDING: '대기중인', ACCEPTED: '수락된', REJECTED: '거절된' }[tab]} 요청이 없어요`} message="새로운 요청이 오면 여기에 표시돼요." />}
         renderItem={({ item }) => (
           <RequestCard

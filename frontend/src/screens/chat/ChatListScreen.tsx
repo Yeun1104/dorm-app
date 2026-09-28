@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { ReactNode, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { errorMessage } from '../../api/client';
 import { chatApi } from '../../api/trade';
@@ -10,12 +10,44 @@ import Icon from '../../components/Icon';
 import { EmptyState, ErrorView, LoadingView, PageHeader, Screen, Thumb } from '../../components/ui';
 import { useBoards } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
+import { useWebDragScroll } from '../../hooks/useWebDragScroll';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { chatListTime } from '../../utils/format';
 
 /** 채팅방을 왼쪽으로 밀면 나오는 버튼 영역 너비 (버튼 2개) */
 const SWIPE_ACTIONS_W = 150;
+/** 채팅방 내용(날짜 등)과 버튼 사이 여백 */
+const SWIPE_GAP = 14;
+/** 끝까지 밀었을 때 이동 거리 */
+const SWIPE_OPEN = SWIPE_ACTIONS_W + SWIPE_GAP;
+
+/** 왼쪽으로 밀면 버튼이 나오는 채팅방 한 줄 (앱은 터치 스크롤, 웹은 마우스로 끌기) */
+function SwipeRow({ onRef, disabled, children }: { onRef: (r: ScrollView | null) => void; disabled: boolean; children: ReactNode }) {
+  const ref = useRef<ScrollView | null>(null);
+  const drag = useWebDragScroll({ scrollTo: (x, animated) => ref.current?.scrollTo({ x, animated }), snap: SWIPE_OPEN, count: 2 });
+  return (
+    <View {...(disabled ? {} : drag.panHandlers)} style={drag.style}>
+      <ScrollView
+        ref={(r) => {
+          ref.current = r;
+          onRef(r);
+        }}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        scrollEnabled={!disabled}
+        snapToOffsets={[0, SWIPE_OPEN]}
+        snapToEnd={false}
+        decelerationRate="fast"
+        onScroll={drag.onScroll}
+        scrollEventThrottle={16}
+      >
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
 
 export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) {
   const me = useMe();
@@ -90,17 +122,11 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
     const isSelected = selected.includes(item.id);
     const unread = item.unreadCount ?? 0;
     return (
-      <ScrollView
-        ref={(r) => {
+      <SwipeRow
+        onRef={(r) => {
           swipeRefs.current.set(item.id, r);
         }}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        scrollEnabled={!editing}
-        snapToOffsets={[0, SWIPE_ACTIONS_W]}
-        snapToEnd={false}
-        decelerationRate="fast"
+        disabled={editing}
       >
       <Pressable
         style={[styles.item, { width: rowWidth }, isSelected && styles.itemSelected]}
@@ -141,7 +167,7 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
           <Text style={styles.swipeText}>나가기</Text>
         </Pressable>
       </View>
-      </ScrollView>
+      </SwipeRow>
     );
   };
 
@@ -242,7 +268,7 @@ const styles = StyleSheet.create({
   selectCircleOn: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   nameWrap: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  swipeActions: { flexDirection: 'row' },
+  swipeActions: { marginLeft: SWIPE_GAP, flexDirection: 'row' },
   swipeBtn: { width: SWIPE_ACTIONS_W / 2, alignItems: 'center', justifyContent: 'center', gap: 4 },
   swipeText: { fontSize: 11, fontWeight: '700', color: 'white' },
   name: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: colors.text },
