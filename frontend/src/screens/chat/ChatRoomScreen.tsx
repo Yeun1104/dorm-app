@@ -1,5 +1,17 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputKeyPressEventData,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '../../api/client';
 import { chatApi, mannerApi, reservationApi } from '../../api/trade';
@@ -20,6 +32,20 @@ import { isMyBoard } from '../home/BoardDetailScreen';
 
 /** 메시지에 id가 없어서 (보낸 시각, 보낸 사람, 내용)으로 같은 메시지를 식별 */
 const msgKey = (m: ChatMessage) => `${m.createdAt}|${m.senderId}|${m.content}`;
+
+/** 입력창: 한 줄 높이 × 최대 6줄까지 늘어나고 그 이상은 입력창 안에서 스크롤 */
+const INPUT_LINE = 20;
+const INPUT_PAD = 10;
+const INPUT_MIN = INPUT_LINE + INPUT_PAD * 2;
+const INPUT_MAX = INPUT_LINE * 6 + INPUT_PAD * 2;
+
+// 웹: 입력창(textarea) 스크롤바 숨김 — RN 스타일로는 지정할 수 없어서 CSS 한 줄 주입
+if (Platform.OS === 'web' && typeof document !== 'undefined' && !document.getElementById('hide-textarea-scrollbar')) {
+  const style = document.createElement('style');
+  style.id = 'hide-textarea-scrollbar';
+  style.textContent = 'textarea{scrollbar-width:none;-ms-overflow-style:none}textarea::-webkit-scrollbar{display:none}';
+  document.head.appendChild(style);
+}
 
 /** 안 읽음 숫자를 다시 받아오는 주기 (상대가 읽었는지 반영) */
 const UNREAD_REFRESH_MS = 8000;
@@ -51,6 +77,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const [lastPage, setLastPage] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [text, setText] = useState('');
+  const [inputHeight, setInputHeight] = useState(INPUT_MIN);
   const [menu, setMenu] = useState(false);
   const [review, setReview] = useState(false);
   const [reviewed, setReviewed] = useState(true);
@@ -149,8 +176,21 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const onSend = () => {
     const content = text.trim();
     if (!content) return;
-    if (send(content)) setText('');
-    else toast('채팅 서버에 연결 중이에요. 잠시 후 다시 보내주세요');
+    if (send(content)) {
+      setText('');
+      setInputHeight(INPUT_MIN);
+    } else toast('채팅 서버에 연결 중이에요. 잠시 후 다시 보내주세요');
+  };
+
+  // 웹(키보드): Enter = 전송, Shift+Enter = 줄바꿈. 한글 조합 중 Enter는 무시.
+  // 앱(폰 키보드)은 Enter가 줄바꿈이고 전송 버튼으로만 보냄
+  const onInputKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+    if (Platform.OS !== 'web') return;
+    const ne = e.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean; isComposing?: boolean; keyCode?: number };
+    if (ne.key === 'Enter' && !ne.shiftKey && !ne.isComposing && ne.keyCode !== 229) {
+      e.preventDefault();
+      onSend();
+    }
   };
 
   if (info.loading && !info.data) return <LoadingView />;
@@ -360,8 +400,11 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
               onChangeText={setText}
               placeholder="메시지를 입력하세요"
               placeholderTextColor="#9aa5a1"
-              style={styles.input}
+              style={[styles.input, { height: inputHeight }]}
               multiline
+              onKeyPress={onInputKeyPress}
+              onContentSizeChange={(e) => setInputHeight(Math.min(INPUT_MAX, Math.max(INPUT_MIN, Math.ceil(e.nativeEvent.contentSize.height))))}
+              scrollEnabled={inputHeight >= INPUT_MAX}
             />
             <Pressable style={[styles.send, !text.trim() && { opacity: 0.5 }]} onPress={onSend} disabled={!text.trim()}>
               <Icon name="send" size={18} color="white" />
@@ -414,7 +457,7 @@ const styles = StyleSheet.create({
   bubbleMeta: { alignItems: 'flex-end' },
   unread: { color: '#e6a817', fontSize: 11, fontWeight: '800' },
   inputBar: { paddingHorizontal: 12, paddingTop: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 7, backgroundColor: 'white' },
-  input: { flex: 1, minHeight: 40, maxHeight: 110, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, borderRadius: 20, backgroundColor: colors.inputBg, fontSize: font.base, color: colors.text },
+  input: { flex: 1, paddingHorizontal: 14, paddingTop: INPUT_PAD, paddingBottom: INPUT_PAD, borderRadius: 20, backgroundColor: colors.inputBg, fontSize: font.base, lineHeight: INPUT_LINE, color: colors.text },
   send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   readOnly: { paddingTop: 14, paddingHorizontal: 16, backgroundColor: '#f5f7f6', alignItems: 'center' },
   readOnlyText: { color: colors.textMuted, fontSize: font.sm },
