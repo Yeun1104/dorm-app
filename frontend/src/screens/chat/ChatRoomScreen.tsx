@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   NativeSyntheticEvent,
   Platform,
   Pressable,
@@ -79,6 +80,8 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const [text, setText] = useState('');
   const [inputHeight, setInputHeight] = useState(INPUT_MIN);
   const [menu, setMenu] = useState(false);
+  // 내 메시지 꾹 누르기(앱)/우클릭(웹) 메뉴 — 누른 위치 근처에 띄움
+  const [msgMenu, setMsgMenu] = useState<{ msg: ChatMessage; top: number } | null>(null);
   const [review, setReview] = useState(false);
   const [reviewed, setReviewed] = useState(true);
 
@@ -291,9 +294,22 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
               <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>
             </View>
           )}
-          <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+          <Pressable
+            style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+            disabled={!mine}
+            delayLongPress={350}
+            onLongPress={(e) => setMsgMenu({ msg: item, top: e.nativeEvent.pageY })}
+            {...(mine && Platform.OS === 'web'
+              ? {
+                  onContextMenu: (e: { preventDefault: () => void; nativeEvent: { pageY: number } }) => {
+                    e.preventDefault();
+                    setMsgMenu({ msg: item, top: e.nativeEvent.pageY });
+                  },
+                }
+              : {})}
+          >
             <Text style={[styles.bubbleText, mine && { color: 'white' }]}>{item.content}</Text>
-          </View>
+          </Pressable>
           {!mine && <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>}
         </View>
       </View>
@@ -413,6 +429,24 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         )}
       </KeyboardAvoidingView>
 
+      <Modal transparent visible={!!msgMenu} animationType="fade" onRequestClose={() => setMsgMenu(null)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMsgMenu(null)} />
+        {msgMenu && (
+          <View style={[styles.msgMenu, { top: Math.max(insets.top + 60, msgMenu.top - 56) }]}>
+            <Pressable
+              style={styles.msgMenuItem}
+              onPress={() => {
+                setMsgMenu(null);
+                // TODO: 백엔드에 메시지 삭제 API(+메시지 id, 소켓으로 삭제 알림)가 생기면 연결
+                toast('전송 취소는 서버 기능이 추가되면 사용할 수 있어요');
+              }}
+            >
+              <Text style={[styles.msgMenuText, { color: colors.danger }]}>전송 취소</Text>
+            </Pressable>
+          </View>
+        )}
+      </Modal>
+
       {reservation && (
         <MannerReviewSheet
           visible={review}
@@ -455,6 +489,9 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: font.base, lineHeight: 20, color: colors.text },
   bubbleTime: { color: '#98a09d', fontSize: 10 },
   bubbleMeta: { alignItems: 'flex-end' },
+  msgMenu: { position: 'absolute', right: 20, minWidth: 120, paddingVertical: 4, borderRadius: 12, backgroundColor: 'white', shadowColor: '#1f414e', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  msgMenuItem: { paddingHorizontal: 16, paddingVertical: 12 },
+  msgMenuText: { fontSize: font.md, fontWeight: '600', color: colors.text },
   unread: { color: '#e6a817', fontSize: 11, fontWeight: '800' },
   inputBar: { paddingHorizontal: 12, paddingTop: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 7, backgroundColor: 'white' },
   input: { flex: 1, paddingHorizontal: 14, paddingTop: INPUT_PAD, paddingBottom: INPUT_PAD, borderRadius: 20, backgroundColor: colors.inputBg, fontSize: font.base, lineHeight: INPUT_LINE, color: colors.text },
