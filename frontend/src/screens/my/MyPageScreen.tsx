@@ -1,9 +1,13 @@
+import * as ImagePicker from 'expo-image-picker';
+import { useState } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { errorMessage } from '../../api/client';
 import { profileApi, reservationApi } from '../../api/trade';
-import { useMe } from '../../auth/AuthContext';
+import { userApi } from '../../api/user';
+import { useAuth, useMe } from '../../auth/AuthContext';
 import Icon from '../../components/Icon';
 import { useToast } from '../../components/Feedback';
-import { Avatar, PageHeader, Screen } from '../../components/ui';
+import { Avatar, BottomSheet, Button, Field, Input, PageHeader, Screen } from '../../components/ui';
 import { SUPPORT_EMAIL } from '../../constants';
 import { useFetch } from '../../hooks/useFetch';
 import type { AppStackParamList, ScreenProps } from '../../navigation/types';
@@ -23,7 +27,60 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
   const reservations = useFetch(() => reservationApi.mine(), [], { refetchOnFocus: true });
 
   const toast = useToast();
+  const { refreshMe } = useAuth();
   const count = (s: string) => reservations.data?.filter((r) => r.status === s).length ?? 0;
+
+  // ───── 프로필 사진 / 닉네임 수정 ─────
+  const [photoSheet, setPhotoSheet] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [nicknameSheet, setNicknameSheet] = useState(false);
+  const [nickname, setNickname] = useState('');
+  const [savingName, setSavingName] = useState(false);
+
+  const pickPhoto = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+    if (res.canceled) return;
+    const a = res.assets[0];
+    setUploading(true);
+    try {
+      await userApi.uploadProfileImage({ uri: a.uri, fileName: a.fileName, mimeType: a.mimeType });
+      await refreshMe();
+      profile.silentReload();
+      setPhotoSheet(false);
+      toast('프로필 사진을 바꿨어요');
+    } catch (e) {
+      toast(errorMessage(e, '사진을 올리지 못했어요 (jpg/png/webp/gif, 5MB 이하)'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetPhoto = () => {
+    setPhotoSheet(false);
+    // TODO: 백엔드에 프로필 사진 삭제(기본 이미지로) API가 생기면 연결 — 지금은 등록/변경(POST)만 있음
+    toast('기본 이미지로 되돌리기는 서버 기능이 추가되면 사용할 수 있어요');
+  };
+
+  const openNickname = () => {
+    setNickname(me.nickname ?? '');
+    setNicknameSheet(true);
+  };
+
+  const saveNickname = async () => {
+    if (!nickname.trim()) return;
+    setSavingName(true);
+    try {
+      await userApi.updateNickname(nickname.trim());
+      await refreshMe();
+      profile.silentReload();
+      setNicknameSheet(false);
+      toast('닉네임을 변경했어요');
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const openInquiry = () =>
     Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[나눠도] 문의')}`).catch(() => toast('메일 앱을 열 수 없어요'));
@@ -53,16 +110,25 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
         }
       >
         <View style={styles.profileCard}>
-          <Pressable style={styles.profileTop} onPress={() => navigation.navigate('UserProfile', { userId: me.userId })}>
-            <Avatar name={me.nickname} size={58} />
+          <View style={styles.profileTop}>
+            {/* 사진 누르면: 갤러리에서 가져오기 / 기본 이미지로 */}
+            <Pressable onPress={() => setPhotoSheet(true)} accessibilityLabel="프로필 사진 변경">
+              <Avatar name={me.nickname} uri={me.profileImageUrl} size={62} />
+              <View style={styles.cameraBadge}>
+                <Icon name="camera" size={12} color={colors.text} />
+              </View>
+            </Pressable>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.name} numberOfLines={1}>{me.nickname}</Text>
+              <Pressable style={styles.nameRow} onPress={openNickname} hitSlop={6} accessibilityLabel="닉네임 변경">
+                <Text style={styles.name} numberOfLines={1}>{me.nickname}</Text>
+                <Icon name="edit" size={14} color={colors.textMuted} />
+              </Pressable>
               <Text style={styles.sub}>거래 {profile.data?.tradeCount ?? 0}회</Text>
             </View>
-            <View style={styles.profileBtn}>
+            <Pressable style={styles.profileBtn} onPress={() => navigation.navigate('UserProfile', { userId: me.userId })}>
               <Text style={styles.profileBtnText}>프로필 보기</Text>
-            </View>
-          </Pressable>
+            </Pressable>
+          </View>
           {profile.data && (
             <View style={styles.manner}>
               <Text style={styles.mannerLabel}>받은 매너 평가</Text>
@@ -100,6 +166,20 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
 
         <Text style={styles.version}>나눠도 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
       </ScrollView>
+
+      <BottomSheet visible={photoSheet} onClose={() => setPhotoSheet(false)}>
+        <Text style={styles.sheetTitle}>프로필 사진</Text>
+        <Button label="갤러리에서 가져오기" onPress={pickPhoto} loading={uploading} />
+        <Button label="기본 이미지로 변경" variant="soft" onPress={resetPhoto} disabled={!me.profileImageUrl || uploading} style={{ marginTop: 8 }} />
+      </BottomSheet>
+
+      <BottomSheet visible={nicknameSheet} onClose={() => setNicknameSheet(false)}>
+        <Text style={styles.sheetTitle}>닉네임 변경</Text>
+        <Field label="새 닉네임">
+          <Input value={nickname} onChangeText={setNickname} maxLength={20} autoFocus />
+        </Field>
+        <Button label="저장" onPress={saveNickname} loading={savingName} style={{ marginTop: 8 }} />
+      </BottomSheet>
     </Screen>
   );
 }
@@ -107,8 +187,11 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
 const styles = StyleSheet.create({
   settings: { color: '#75807c', fontSize: font.md },
   profileCard: { padding: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 22, backgroundColor: 'white' },
+  cameraBadge: { position: 'absolute', right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: 'white', backgroundColor: '#eef1f0', alignItems: 'center', justifyContent: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sheetTitle: { marginBottom: 14, fontSize: 20, fontWeight: '800', color: colors.text },
   profileTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  name: { fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
+  name: { flexShrink: 1, fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   sub: { marginTop: 3, color: colors.textMuted, fontSize: font.sm },
   profileBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: '#f2f5f4' },
   profileBtnText: { fontSize: font.xs, fontWeight: '700', color: colors.textBody },

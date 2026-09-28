@@ -169,10 +169,15 @@ export function CountBadge({ count, style }: { count: number; style?: StyleProp<
 
 // ───────── 아바타 / 썸네일 ─────────
 
-export function Avatar({ name, size = 39 }: { name?: string | null; size?: number }) {
+/** 프로필 사진이 있으면 사진, 없으면(기본 이미지) 닉네임 첫 글자 */
+export function Avatar({ name, size = 39, uri }: { name?: string | null; size?: number; uri?: string | null }) {
   return (
     <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[s.avatarText, { fontSize: size * 0.36 }]}>{(name ?? '?').slice(0, 1)}</Text>
+      {uri ? (
+        <Image source={{ uri }} style={{ width: size, height: size }} contentFit="cover" />
+      ) : (
+        <Text style={[s.avatarText, { fontSize: size * 0.36 }]}>{(name ?? '?').slice(0, 1)}</Text>
+      )}
     </View>
   );
 }
@@ -446,7 +451,7 @@ export const s = StyleSheet.create({
   countBadge: { position: 'absolute', minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center' },
   countBadgeText: { color: 'white', fontSize: 10, fontWeight: '700' },
 
-  avatar: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#d9edf3' },
+  avatar: { overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#d9edf3' },
   avatarText: { color: colors.primaryDeep, fontWeight: '800' },
 
   progressTrack: { overflow: 'hidden', borderRadius: 10, backgroundColor: '#e8f1f3' },

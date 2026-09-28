@@ -1,5 +1,6 @@
+import { Platform } from 'react-native';
 import { api, get, post } from './client';
-import type { BoardPage, UserInfo } from './types';
+import type { BoardPage, CommonRes, UserInfo } from './types';
 
 // ⚠️ /api/users/*, /api/auth/* 는 CommonResDto로 감싸지 않은 raw 응답이라 api를 직접 씀
 
@@ -15,6 +16,23 @@ export const userApi = {
   /** DELETE /api/users/me — 탈퇴 */
   withdraw: async () => {
     await api.delete('/api/users/me');
+  },
+
+  /**
+   * POST /api/users/me/profile-image (multipart "image") — jpg/png/webp/gif, 5MB 이하. 기존 사진은 서버에서 교체
+   * 웹은 파일 uri를 Blob으로 바꿔서, 앱은 RN FormData 형식({ uri, name, type })으로 보냄
+   */
+  uploadProfileImage: async (img: { uri: string; fileName?: string | null; mimeType?: string | null }) => {
+    const name = img.fileName ?? 'profile.jpg';
+    const type = img.mimeType ?? 'image/jpeg';
+    const form = new FormData();
+    if (Platform.OS === 'web') form.append('image', await (await fetch(img.uri)).blob(), name);
+    else form.append('image', { uri: img.uri, name, type } as unknown as Blob);
+    const res = await api.post<CommonRes<{ profileImageUrl: string }>>('/api/users/me/profile-image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (d) => d,
+    });
+    return res.data.result.profileImageUrl;
   },
 
   /** GET /api/my-page/like?page= */

@@ -101,7 +101,7 @@ function ProfileBody({ profile, onBoard, onEditNickname }: { profile: Profile; o
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
       <View style={styles.hero}>
-        <Avatar name={profile.nickname} size={62} />
+        <Avatar name={profile.nickname} uri={profile.profileImageUrl} size={62} />
         {onEditNickname ? (
           <Pressable style={styles.nameRow} onPress={onEditNickname} hitSlop={6} accessibilityLabel="닉네임 변경">
             <Text style={[styles.name, { marginTop: 0 }]}>{profile.nickname}</Text>

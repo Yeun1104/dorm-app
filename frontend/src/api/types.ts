@@ -179,6 +179,8 @@ export interface UserInfo {
   nickname: string;
   email: string;
   kakaoId: string;
+  /** 앱에서 직접 올린 프로필 사진 (없으면 null → 기본 이미지) */
+  profileImageUrl: string | null;
 }
 
 export interface BoardSummary {
@@ -194,6 +196,7 @@ export interface BoardSummary {
 export interface Profile {
   userId: number;
   nickname: string;
+  profileImageUrl: string | null;
   tradeCount: number;
   topMannerBadges: MannerBadge[];
   /** 기숙사 계정 연동 여부 (인증 배지) */
