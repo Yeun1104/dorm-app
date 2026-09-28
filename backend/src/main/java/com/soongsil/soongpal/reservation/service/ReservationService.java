@@ -52,7 +52,7 @@ public class ReservationService {
     /** API 1: 참여 요청 (구매자 → 방장). 이 시점엔 채팅방도 안 생기고 수량도 안 깎임. */
     @Transactional
     public ReservationResDto createReservation(Long buyerId, Long boardId, ReservationCreateReqDto dto) {
-        Board board = boardRepository.findById(boardId)
+        Board board = boardRepository.findByIdForUpdate(boardId) // 동시 참여 요청 직렬화 (중복 요청 방지)
                 .orElseThrow(() -> new BoardException(BoardErrorCode.BOARD_NOT_FOUND));
 
         if (board.getStatus() != BoardStatus.IN_PROGRESS) {
@@ -131,7 +131,11 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
         Board board = reservation.getBoard();
-        if (!board.getUser().getId().equals(userId)) {
+        boolean isOwner = board.getUser().getId().equals(userId);
+        boolean isBuyer = reservation.getBuyer().getId().equals(userId);
+        // 수락/거절/취소는 방장만. 거래완료는 채팅방에서 방장·구매자 누구나 누를 수 있음
+        boolean allowed = isOwner || (isBuyer && newStatus == ReservationStatus.COMPLETED);
+        if (!allowed) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_OWNER_ONLY);
         }
 
@@ -166,7 +170,7 @@ public class ReservationService {
             case COMPLETED -> {
                 reservation.markCompleted();
                 notificationService.notify(
-                        reservation.getBuyer(),
+                        isOwner ? reservation.getBuyer() : board.getUser(), // 거래완료를 누르지 않은 상대에게
                         NotificationType.RESERVATION_COMPLETED,
                         "거래 완료",
                         "'" + board.getTitle() + "' 거래가 완료됐어요. 매너 평가를 남겨보세요!",
