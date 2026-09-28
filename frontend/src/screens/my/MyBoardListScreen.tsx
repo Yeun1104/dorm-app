@@ -15,7 +15,6 @@ import { useLikeToggle } from '../../hooks/useLikeToggle';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { timeAgo, won } from '../../utils/format';
-import { placeName } from '../../utils/place';
 
 function usePagedBoards(fetchPage: (page: number) => Promise<BoardPage>) {
   const toast = useToast();
@@ -200,7 +199,15 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
   );
 }
 
-/** 내가 쓴 글 카드: 상태 · 메뉴 / 사진 + 정보 / (모집중이면) 요청 보기 · 판매완료 */
+/**
+ * 내가 쓴 글 카드
+ * [사진]  ● 모집중                    ⋯
+ *         제목 (최대 2줄)
+ *         12/30개 · 2시간 전
+ *         12,000원 /개
+ * ───────────────────────────────────
+ * 참여 요청 관리 2 •            거래완료 ›   (모집중일 때만)
+ */
 function MyPostCard({
   board,
   onPress,
@@ -218,35 +225,45 @@ function MyPostCard({
   const collected = board.totalQuantity - board.remainingQuantity;
   return (
     <Pressable style={styles.post} onPress={onPress}>
-      <View style={styles.cardTop}>
-        <Text style={[styles.status, !recruiting && styles.statusDone]}>{recruiting ? '모집중' : '모집완료'}</Text>
-        <Pressable onPress={onMenu} hitSlop={10} style={styles.more}>
-          <Text style={styles.moreText}>•••</Text>
-        </Pressable>
-      </View>
-
       <View style={styles.postBody}>
-        <Thumb uri={board.images[0]?.imageUrl} size={92} radius={14} />
+        <View>
+          <Thumb uri={board.images[0]?.imageUrl} size={78} radius={14} />
+          {!recruiting && (
+            <View style={styles.doneCover}>
+              <Text style={styles.doneCoverText}>모집완료</Text>
+            </View>
+          )}
+        </View>
         <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.cardTop}>
+            <View style={styles.statusRow}>
+              {recruiting && <View style={styles.statusDot} />}
+              <Text style={[styles.status, !recruiting && styles.statusDone]}>{recruiting ? '모집중' : '모집완료'}</Text>
+            </View>
+            <Pressable onPress={onMenu} hitSlop={10} style={styles.more} accessibilityLabel="더보기">
+              <Text style={styles.moreText}>•••</Text>
+            </Pressable>
+          </View>
           <Text style={styles.postTitle} numberOfLines={2}>{board.title}</Text>
+          <Text style={styles.postMeta} numberOfLines={1}>
+            {collected}/{board.totalQuantity}개 · {timeAgo(board.createdAt)}
+          </Text>
           <Text style={styles.postPrice}>
             {won(board.unitPrice)}
-            <Text style={styles.postUnit}> / 개</Text>
-          </Text>
-          <Text style={styles.postMeta} numberOfLines={1}>
-            {collected}/{board.totalQuantity}개 모임 · {[placeName(board.location), timeAgo(board.createdAt)].filter(Boolean).join(' · ')}
+            <Text style={styles.postUnit}> /개</Text>
           </Text>
         </View>
       </View>
 
       {recruiting && (
         <View style={styles.postActions}>
-          <Pressable style={styles.postBtn} onPress={onRequests}>
-            <Text style={styles.postBtnText}>참여 요청{board.waitingCount > 0 ? ` ${board.waitingCount}` : ''}</Text>
+          <Pressable style={styles.postAction} onPress={onRequests} hitSlop={6}>
+            <Text style={styles.postActionText}>참여 요청 관리{board.waitingCount > 0 ? ` ${board.waitingCount}` : ''}</Text>
             {board.waitingCount > 0 && <View style={styles.dot} />}
           </Pressable>
-          <Pressable style={[styles.postBtn, styles.postBtnDark]} onPress={onSaleComplete}>
-            <Text style={[styles.postBtnText, { color: 'white' }]}>판매완료</Text>
+          <Pressable style={styles.postAction} onPress={onSaleComplete} hitSlop={6}>
+            <Text style={[styles.postActionText, styles.postActionStrong]}>거래완료</Text>
+            <Icon name="chevron" size={14} color={colors.text} />
           </Pressable>
         </View>
       )}
@@ -264,21 +281,25 @@ export function MyPostsScreen({ navigation }: ScreenProps<'MyPosts'>) {
 
 const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  post: { marginBottom: 12, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white' },
-  postBody: { marginTop: 12, flexDirection: 'row', gap: 14 },
-  postTitle: { fontSize: font.base, lineHeight: 21, fontWeight: '700', color: colors.text },
-  postPrice: { marginTop: 5, fontSize: 16, fontWeight: '800', color: colors.text },
-  postUnit: { fontSize: font.xs, fontWeight: '500', color: colors.textMuted },
-  postMeta: { marginTop: 5, fontSize: font.xs, color: colors.textMuted },
-  postActions: { marginTop: 14, flexDirection: 'row', gap: 8 },
-  postBtn: { flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 12, backgroundColor: '#f1f3f2' },
-  postBtnDark: { backgroundColor: colors.text },
-  postBtnText: { fontSize: font.sm, fontWeight: '700', color: colors.textBody },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.badge },
-  status: { fontSize: font.md, fontWeight: '800', color: colors.text },
+  post: { marginBottom: 12, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white' },
+  postBody: { flexDirection: 'row', gap: 13 },
+  doneCover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14, backgroundColor: 'rgba(22,29,27,0.45)', alignItems: 'center', justifyContent: 'center' },
+  doneCoverText: { fontSize: font.xs, fontWeight: '800', color: 'white' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  status: { fontSize: font.xs, fontWeight: '700', color: colors.primaryDark },
   statusDone: { color: colors.textFaint },
-  more: { paddingHorizontal: 4 },
-  moreText: { color: colors.textMuted, fontWeight: '800', letterSpacing: 1 },
+  more: { paddingHorizontal: 2 },
+  moreText: { color: colors.textFaint, fontWeight: '800', letterSpacing: 1 },
+  postTitle: { marginTop: 3, fontSize: font.base, lineHeight: 20, fontWeight: '700', color: colors.text },
+  postPrice: { marginTop: 3, fontSize: 15, fontWeight: '800', color: colors.text },
+  postUnit: { fontSize: font.xs, fontWeight: '500', color: colors.textMuted },
+  postMeta: { marginTop: 4, fontSize: font.xs, color: colors.textMuted },
+  postActions: { marginTop: 12, paddingTop: 11, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.borderLight },
+  postAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  postActionText: { fontSize: font.sm, fontWeight: '600', color: colors.textBody },
+  postActionStrong: { fontWeight: '800', color: colors.text },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.badge },
   bubble: { position: 'absolute', right: 26, width: 110, paddingVertical: 4, borderRadius: 12, backgroundColor: 'white', shadowColor: '#1f414e', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   bubbleTail: { position: 'absolute', top: -6, right: 12, width: 12, height: 12, backgroundColor: 'white', transform: [{ rotate: '45deg' }] },
   bubbleItem: { paddingHorizontal: 16, paddingVertical: 11 },
