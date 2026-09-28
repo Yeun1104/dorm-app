@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '../../api/client';
@@ -17,6 +17,12 @@ import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { clockTime, parseServerDate, won } from '../../utils/format';
 import { isMyBoard } from '../home/BoardDetailScreen';
+
+/** 메시지에 id가 없어서 (보낸 시각, 보낸 사람, 내용)으로 같은 메시지를 식별 */
+const msgKey = (m: ChatMessage) => `${m.createdAt}|${m.senderId}|${m.content}`;
+
+/** 안 읽음 숫자를 다시 받아오는 주기 (상대가 읽었는지 반영) */
+const UNREAD_REFRESH_MS = 8000;
 
 export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatRoom'>) {
   const { roomId } = route.params;
@@ -66,11 +72,55 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     [roomId, toast],
   );
 
-  useEffect(() => {
-    loadPage(0);
-  }, [loadPage]);
+  /**
+   * 읽음 표시(메시지 왼쪽 '1'):
+   * 서버의 unreadCount는 '이 메시지 이후를 안 읽은 방 참여자 수'인데 보낸 사람 본인도 포함됨(보내도 내 읽음 위치가 안 움직임).
+   * → 방에 있는 동안 내 읽음 위치를 계속 최신으로 올려두면, 이후 받아오는 숫자는 상대방 기준이 됨.
+   */
+  const markReadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markReadLatest = useCallback(async () => {
+    const r = await chatApi.room(roomId);
+    if (r.lastMessageId) await chatApi.markRead(roomId, r.lastMessageId);
+  }, [roomId]);
+  const scheduleMarkRead = useCallback(() => {
+    if (markReadTimer.current) clearTimeout(markReadTimer.current);
+    markReadTimer.current = setTimeout(() => markReadLatest().catch(() => {}), 400);
+  }, [markReadLatest]);
 
-  const { connected, send } = useChatSocket(roomId, (msg) => setMessages((prev) => [msg, ...prev]));
+  // 내 읽음 위치를 먼저 올린 뒤 첫 페이지를 받아야 숫자에 내가 안 섞임
+  useEffect(() => {
+    markReadLatest()
+      .catch(() => {})
+      .finally(() => loadPage(0));
+    return () => {
+      if (markReadTimer.current) clearTimeout(markReadTimer.current);
+    };
+  }, [loadPage, markReadLatest]);
+
+  // 상대가 읽었는지 주기적으로 반영 (소켓에 읽음 이벤트가 없어서)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      chatApi
+        .messages(roomId, 0)
+        .then((res) => {
+          const fresh = new Map(res.content.map((m) => [msgKey(m), m.unreadCount]));
+          setMessages((prev) => prev.map((m) => (fresh.has(msgKey(m)) ? { ...m, unreadCount: fresh.get(msgKey(m))! } : m)));
+        })
+        .catch(() => {});
+    }, UNREAD_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [roomId]);
+
+  const { connected, send } = useChatSocket(roomId, (msg) => {
+    const mineMsg = msg.senderId === me.userId;
+    setMessages((prev) => [
+      // 내가 보낸 직후엔 서버 숫자에 나도 포함돼 있어서 1 뺌
+      mineMsg ? { ...msg, unreadCount: Math.max(0, (msg.unreadCount ?? 0) - 1) } : msg,
+      // 상대가 보냈다면 그 전 내 메시지는 다 읽은 것
+      ...(mineMsg ? prev : prev.map((m) => (m.senderId === me.userId ? { ...m, unreadCount: 0 } : m))),
+    ]);
+    scheduleMarkRead();
+  });
 
   // 거래완료된 방이면 내가 이미 매너 평가를 보냈는지 (서버 기준 — 다른 기기에서도 정확)
   const completedReservationId = info.data?.reservation?.status === 'COMPLETED' ? info.data.reservation.id : null;
@@ -195,7 +245,12 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
       <View>
         {showDivider && <Text style={styles.divider}>{`${d!.getMonth() + 1}월 ${d!.getDate()}일`}</Text>}
         <View style={[styles.bubbleRow, mine ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
-          {mine && <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>}
+          {mine && (
+            <View style={styles.bubbleMeta}>
+              {(item.unreadCount ?? 0) > 0 && <Text style={styles.unread}>{item.unreadCount}</Text>}
+              <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>
+            </View>
+          )}
           <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
             <Text style={[styles.bubbleText, mine && { color: 'white' }]}>{item.content}</Text>
           </View>
@@ -356,6 +411,8 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: 'white', borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: font.base, lineHeight: 20, color: colors.text },
   bubbleTime: { color: '#98a09d', fontSize: 10 },
+  bubbleMeta: { alignItems: 'flex-end' },
+  unread: { color: '#e6a817', fontSize: 11, fontWeight: '800' },
   inputBar: { paddingHorizontal: 12, paddingTop: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 7, backgroundColor: 'white' },
   input: { flex: 1, minHeight: 40, maxHeight: 110, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, borderRadius: 20, backgroundColor: colors.inputBg, fontSize: font.base, color: colors.text },
   send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
