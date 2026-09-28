@@ -30,6 +30,9 @@ public class User extends BaseEntity {
 
     private String email;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     private String refreshToken;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -69,6 +72,10 @@ public class User extends BaseEntity {
 
     public void updateNickname(String nickName) {
         this.nickName = nickName;
+    }
+
+    public void updateProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 
     public void updateRefreshToken(String refreshToken) {

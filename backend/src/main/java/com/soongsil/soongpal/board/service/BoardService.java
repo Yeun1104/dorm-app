@@ -30,6 +30,12 @@ import java.util.Collections;
 import java.util.List;
 
 
+/**
+ * ⚠️ 클래스 레벨에 @Transactional(readOnly = true)가 걸려있음 — 그래서 쓰기(insert/update/delete)가
+ * 필요한 메서드는 반드시 메서드 위에 @Transactional(readOnly 아님)을 따로 붙여서 오버라이드해야 함.
+ * 이걸 깜빡하면(addLike가 그랬음) "Connection is read-only" 에러가 남 — DB 커넥션 자체가 읽기전용으로
+ * 열려서 insert/update 쿼리가 통째로 거부됨.
+ */
 @Slf4j
 @RequiredArgsConstructor
 @Service
@@ -213,6 +219,7 @@ public class BoardService {
         return BoardPageResDto.from(boardPageResDto);
     }
 
+    @Transactional
     public LikeResDto addLike(Long boardId, Long userId) {
         User findUser = getUser(userId);
 
@@ -234,6 +241,7 @@ public class BoardService {
         return LikeResDto.of(boardId, likeCount);
     }
 
+    @Transactional
     public LikeResDto deleteLike(Long boardId, Long userId) {
         Like findLike = likeRepository.findByBoardIdAndUserId(boardId, userId)
                 .orElseThrow(() -> new BoardException(BoardErrorCode.LIKE_NOT_FOUND));
@@ -244,6 +252,7 @@ public class BoardService {
         return LikeResDto.of(boardId, likeCount);
     }
 
+    @Transactional(readOnly = true)
     public LikeResDto getLikeCount(Long boardId) {
         int likeCount = likeRepository.countByBoardId(boardId);
         return LikeResDto.of(boardId, likeCount);

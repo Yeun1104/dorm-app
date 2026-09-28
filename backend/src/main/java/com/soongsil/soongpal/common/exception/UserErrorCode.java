@@ -17,6 +17,10 @@ public enum UserErrorCode {
     INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "닉네임은 한글 2~8자 또는 영문 4~12자로, 공백과 특수문자 없이 입력해주세요."),
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "이용이 제한된 계정입니다. 게시글 작성/채팅이 제한됩니다."),
 
+    // 프로필 이미지
+    PROFILE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "jpg, png, webp, gif 형식의 5MB 이하 이미지만 등록할 수 있습니다."),
+    PROFILE_IMAGE_UPLOAD_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "프로필 이미지를 저장하지 못했습니다. 잠시 후 다시 시도해주세요."),
+
     // 학교 인증
     SCHOOL_VERIFICATION_REQUIRED(HttpStatus.FORBIDDEN, "학교 계정 인증이 완료된 사용자만 이용할 수 있습니다.");
 

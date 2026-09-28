@@ -10,11 +10,13 @@ public class UserInfoResponseDto {
     private String nickname;
     private String email;
     private String kakaoId;
+    private String profileImageUrl;
 
     public UserInfoResponseDto(User user) {
         this.userId = user.getId();
         this.nickname = user.getNickName();
         this.email = user.getEmail();
         this.kakaoId = user.getKakaoId();
+        this.profileImageUrl = user.getProfileImageUrl();
     }
 }

@@ -8,17 +8,18 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 /**
- * ⚠️ 이게 없으면 STOMP CONNECT 시점에 인증이 전혀 안 붙어서, ChatController의
- * headerAccessor.getUser()가 항상 null이 되고 → 모든 메시지 전송이 USER_NOT_FOUND로 실패함
- * (senderId가 항상 0L로 떨어지기 때문). 실제로 이 인터셉터가 누락되어 있었음.
+ * STOMP CONNECT 프레임의 Authorization 헤더(Bearer accessToken)를 검증해서, 성공하면 STOMP 세션에
+ * Authentication을 심어줌. 이후 같은 세션으로 보내는 모든 메시지에서 headerAccessor.getUser()로 그대로 꺼내 쓸 수 있음.
  *
- * CONNECT 프레임의 Authorization 헤더(Bearer accessToken)를 꺼내서 검증하고,
- * 성공하면 STOMP 세션에 Authentication을 심어줌 — 이후 이 세션으로 보내는 모든 메시지에서
- * headerAccessor.getUser()로 그대로 재사용됨(세션 단위로 유지되는 STOMP의 특성).
+ * ⚠️ 반드시 MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class)로 "메시지에 붙어있는 원본
+ * accessor"를 꺼내서 setUser 해야 함. StompHeaderAccessor.wrap(message)는 헤더를 복사한 새 accessor를 만들어서,
+ * 거기에 setUser를 해도 실제 메시지에는 반영이 안 됨 → CONNECT는 통과하는데 이후 메시지의 user가 항상 null이
+ * 되어 senderId=0 → USER_NOT_FOUND가 나는 버그가 있었음.
  */
 @Slf4j
 @Component
@@ -29,9 +30,9 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
 
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {

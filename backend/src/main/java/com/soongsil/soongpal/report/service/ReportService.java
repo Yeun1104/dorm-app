@@ -42,6 +42,7 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final BoardRepository boardRepository;
+    private final DiscordReportNotifier discordReportNotifier;
 
     @Transactional
     public ReportResDto createReport(Long reporterId, ReportCreateReqDto dto) {
@@ -69,6 +70,8 @@ public class ReportService {
         reportRepository.save(report);
 
         applyAutoBlindIfNeeded(reportedUser);
+
+        discordReportNotifier.notifyNewReport(report);
 
         return ReportResDto.from(report);
     }
