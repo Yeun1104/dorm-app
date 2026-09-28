@@ -28,6 +28,8 @@ export type AppStackParamList = {
 
   // 공통
   UserProfile: { userId: number };
+  /** 다른 사용자가 쓴 글 전체 (메인 목록 모양) */
+  UserBoards: { userId: number };
   Report: { userId: number; nickname: string; boardId?: number };
 
   // 기숙사생활

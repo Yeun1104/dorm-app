@@ -11,6 +11,7 @@ import SignupScreen from '../screens/auth/SignupScreen';
 import ChatListScreen from '../screens/chat/ChatListScreen';
 import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
 import ReportScreen from '../screens/common/ReportScreen';
+import UserBoardsScreen from '../screens/common/UserBoardsScreen';
 import UserProfileScreen from '../screens/common/UserProfileScreen';
 import {
   InquiryDetailScreen,
@@ -56,6 +57,7 @@ function sharedScreens() {
       <Stack.Screen name="ReservationManage" component={ReservationManageScreen} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="UserBoards" component={UserBoardsScreen} />
       <Stack.Screen name="Report" component={ReportScreen} />
       <Stack.Screen name="MyPosts" component={MyPostsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />

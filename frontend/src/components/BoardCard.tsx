@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { Board } from '../api/types';
+import type { Board, BoardSummary } from '../api/types';
 import { colors, font } from '../theme';
 import { timeAgo, won } from '../utils/format';
 import { placeName } from '../utils/place';
@@ -79,7 +79,36 @@ export function CompactBoardCard({ board, onPress, right, footer }: { board: Boa
   );
 }
 
+/**
+ * 프로필의 판매 글: 정사각형 사진 + 제목·가격·장소. 모집완료면 사진을 어둡게 덮고 '모집완료'
+ * (프로필 응답은 요약뿐이라 사진·장소는 board(상세)가 오면 채움)
+ */
+export function SquareBoardCard({ summary, board, onPress, size = 148 }: { summary: BoardSummary; board?: Board | null; onPress: () => void; size?: number }) {
+  const done = summary.status !== 'IN_PROGRESS';
+  const place = placeName(board?.location);
+  return (
+    <Pressable style={{ width: size }} onPress={onPress}>
+      <View>
+        <Thumb uri={board?.images[0]?.imageUrl} size={size} radius={16} />
+        {done && (
+          <View style={[styles.squareCover, { borderRadius: 16 }]}>
+            <Text style={styles.squareCoverText}>모집완료</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.squareTitle} numberOfLines={1}>{summary.title}</Text>
+      <Text style={[styles.squarePrice, done && { color: colors.textMuted }]}>{won(summary.unitPrice)}</Text>
+      {!!place && <Text style={styles.squarePlace} numberOfLines={1}>{place}</Text>}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  squareCover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(60,66,64,0.55)', alignItems: 'center', justifyContent: 'center' },
+  squareCoverText: { fontSize: font.sm, fontWeight: '800', color: 'white' },
+  squareTitle: { marginTop: 8, fontSize: font.md, fontWeight: '600', color: colors.text },
+  squarePrice: { marginTop: 2, fontSize: 15, fontWeight: '800', color: colors.text },
+  squarePlace: { marginTop: 2, fontSize: font.xs, color: colors.textMuted },
   card: { flexDirection: 'row', gap: 14, padding: 13, backgroundColor: 'white', borderWidth: 1, borderColor: colors.borderLight, borderRadius: 20 },
   info: { flex: 1, minWidth: 0, paddingTop: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
