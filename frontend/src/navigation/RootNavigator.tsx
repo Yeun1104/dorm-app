@@ -11,6 +11,7 @@ import SignupScreen from '../screens/auth/SignupScreen';
 import ChatListScreen from '../screens/chat/ChatListScreen';
 import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
 import ReportScreen from '../screens/common/ReportScreen';
+import MannerReviewScreen from '../screens/common/MannerReviewScreen';
 import UserBoardsScreen from '../screens/common/UserBoardsScreen';
 import UserProfileScreen from '../screens/common/UserProfileScreen';
 import {
@@ -34,6 +35,7 @@ import HomeScreen from '../screens/home/HomeScreen';
 import NotificationsScreen from '../screens/home/NotificationsScreen';
 import ReservationManageScreen, { RequestsScreen } from '../screens/home/ReservationManageScreen';
 import DormAccountScreen from '../screens/my/DormAccountScreen';
+import MannerReviewsScreen from '../screens/my/MannerReviewsScreen';
 import { LikedBoardsScreen, MyPostsScreen } from '../screens/my/MyBoardListScreen';
 import MyPageScreen from '../screens/my/MyPageScreen';
 import MyReservationsScreen from '../screens/my/MyReservationsScreen';
@@ -58,8 +60,10 @@ function sharedScreens() {
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       <Stack.Screen name="UserBoards" component={UserBoardsScreen} />
+      <Stack.Screen name="MannerReview" component={MannerReviewScreen} />
       <Stack.Screen name="Report" component={ReportScreen} />
       <Stack.Screen name="MyPosts" component={MyPostsScreen} />
+      <Stack.Screen name="MannerReviews" component={MannerReviewsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     </>

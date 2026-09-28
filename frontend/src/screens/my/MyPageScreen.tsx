@@ -14,6 +14,7 @@ const MENU: [string, keyof AppStackParamList][] = [
   ['내 참여 신청 내역', 'MyReservations'],
   ['좋아요한 글', 'LikedBoards'],
   ['내가 쓴 글', 'MyPosts'],
+  ['매너 평가', 'MannerReviews'],
   ['기숙사 계정 관리', 'DormAccount'],
 ];
 
