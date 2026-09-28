@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { errorMessage } from '../../api/client';
 import { notificationApi } from '../../api/notification';
 import type { NotificationPreference } from '../../api/types';
 import { useToast } from '../../components/Feedback';
 import { LoadingView, Screen, SubHeader } from '../../components/ui';
 import type { ScreenProps } from '../../navigation/types';
-import { colors } from '../../theme';
+import { colors, font } from '../../theme';
 import { settingStyles as styles, switchColors } from './settingsShared';
+
+const masterStyles = StyleSheet.create({
+  master: { paddingHorizontal: 16, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { fontSize: 17, fontWeight: '800', color: colors.text },
+  sub: { marginTop: 3, fontSize: font.sm, color: colors.textMuted },
+});
 
 // 서버 알림 설정 (카테고리별). 채팅방 하나만 끄는 건 채팅방 ••• 메뉴에서
 const NOTIFICATION_ITEMS: { key: keyof NotificationPreference; label: string; sub: string }[] = [
@@ -43,6 +49,8 @@ export default function NotificationSettingsScreen(_: ScreenProps<'NotificationS
       });
   };
 
+  const anyOn = !!noti && NOTIFICATION_ITEMS.some((n) => noti[n.key]);
+
   return (
     <Screen bg={colors.bgSub}>
       <SubHeader title="알림 설정" />
@@ -50,7 +58,20 @@ export default function NotificationSettingsScreen(_: ScreenProps<'NotificationS
         <LoadingView />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18 }}>
-          <View style={styles.section}>
+          {/* 전체 알림: 아래 4개를 한 번에 켜고 끔 (서버엔 전체 값이 따로 없어서 하나라도 켜져 있으면 켜짐으로 표시) */}
+          <View style={[styles.section, masterStyles.master]}>
+            <View style={{ flex: 1 }}>
+              <Text style={masterStyles.title}>나눠도 알림 전체 받기</Text>
+              <Text style={masterStyles.sub}>끄면 아래 알림을 모두 받지 않아요</Text>
+            </View>
+            <Switch
+              value={anyOn}
+              onValueChange={(v) => updateNoti({ chatEnabled: v, reservationEnabled: v, boardStatusEnabled: v, dormNoticeEnabled: v })}
+              {...switchColors}
+            />
+          </View>
+
+          <View style={[styles.section, !anyOn && { opacity: 0.5 }]}>
             <Text style={styles.sectionTitle}>받을 알림</Text>
             {NOTIFICATION_ITEMS.map((n, i) => (
               <View key={n.key} style={[styles.item, i === NOTIFICATION_ITEMS.length - 1 && { borderBottomWidth: 0 }]}>

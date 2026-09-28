@@ -54,7 +54,8 @@ export function SubHeader({ title, subtitle, action, onBack }: { title: string; 
       <Pressable style={s.subBack} onPress={onBack ?? (() => nav.goBack())} hitSlop={8}>
         <Icon name="back" size={22} />
       </Pressable>
-      <View style={s.subTitleWrap}>
+      {/* 제목은 헤더 정가운데 고정 — 오른쪽 버튼(예: '전체 지우기')이 생겨도 밀리지 않게 */}
+      <View style={s.subTitleWrap} pointerEvents="none">
         <Text style={s.subTitle} numberOfLines={1}>{title}</Text>
         {!!subtitle && <Text style={s.subSubtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
@@ -430,12 +431,12 @@ export const s = StyleSheet.create({
   eyebrow: { color: colors.textSub, fontSize: font.xs, fontWeight: '600', marginBottom: 2 },
   pageTitle: { fontSize: font.title, fontWeight: '800', color: colors.text, letterSpacing: -0.8 },
 
-  subHeader: { height: 64, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.borderLight, backgroundColor: 'white' },
-  subBack: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f2f5f3', alignItems: 'center', justifyContent: 'center' },
-  subTitleWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
+  subHeader: { height: 64, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight, backgroundColor: 'white' },
+  subBack: { zIndex: 1, width: 38, height: 38, borderRadius: 19, backgroundColor: '#f2f5f3', alignItems: 'center', justifyContent: 'center' },
+  subTitleWrap: { position: 'absolute', left: 96, right: 96, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   subTitle: { fontSize: 17, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
   subSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: font.xs },
-  subAction: { minWidth: 38, alignItems: 'flex-end' },
+  subAction: { zIndex: 1, minWidth: 38, maxWidth: 90, alignItems: 'flex-end' },
   headerAdd: { height: 33, paddingHorizontal: 10, flexDirection: 'row', gap: 3, alignItems: 'center', borderRadius: 10, backgroundColor: colors.primary },
   headerAddText: { color: 'white', fontSize: font.xs, fontWeight: '700' },
 
