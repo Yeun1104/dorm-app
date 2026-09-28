@@ -115,6 +115,10 @@ export interface ChatRoom {
 }
 
 export interface ChatMessage {
+  /** TODO(백엔드): 전송 취소/답장에 필요. 지금은 응답에 없음 */
+  id?: number;
+  /** TODO(백엔드): 전송 취소된 메시지면 true → '삭제된 채팅입니다'로 표시 */
+  deleted?: boolean;
   roomId: number;
   senderId: number;
   senderName: string;

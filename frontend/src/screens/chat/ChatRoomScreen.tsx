@@ -23,7 +23,6 @@ import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
 import MannerReviewSheet from '../../components/MannerReviewSheet';
 import { Avatar, ErrorView, LoadingView, Screen, Thumb } from '../../components/ui';
-import { RESERVATION_STATUS_LABEL } from '../../constants';
 import { fetchBoardCached, invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
@@ -301,7 +300,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     const openProfile = () => navigation.navigate('UserProfile', { userId: item.senderId });
     return (
       <View>
-        {showDivider && <Text style={styles.divider}>{`${d!.getMonth() + 1}월 ${d!.getDate()}일`}</Text>}
+        {showDivider && <Text style={styles.divider}>{`${d!.getFullYear()}년 ${d!.getMonth() + 1}월 ${d!.getDate()}일`}</Text>}
         {firstOfGroup && (
           <Pressable style={styles.senderRow} onPress={openProfile} hitSlop={4}>
             <Avatar name={item.senderName} uri={otherProfile.data?.profileImageUrl} size={32} />
@@ -317,7 +316,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
           )}
           <Pressable
             style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-            disabled={!mine}
+            disabled={!mine || item.deleted}
             delayLongPress={350}
             onLongPress={(e) => setMsgMenu({ msg: item, top: e.nativeEvent.pageY })}
             {...(mine && Platform.OS === 'web'
@@ -329,7 +328,14 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
                 }
               : {})}
           >
-            <Text style={[styles.bubbleText, mine && { color: 'white' }]}>{item.content}</Text>
+            {item.deleted ? (
+              <View style={styles.deletedRow}>
+                <Icon name="alert" size={14} color={mine ? 'rgba(255,255,255,0.85)' : colors.textMuted} />
+                <Text style={[styles.deletedText, mine && { color: 'rgba(255,255,255,0.85)' }]}>삭제된 채팅입니다</Text>
+              </View>
+            ) : (
+              <Text style={[styles.bubbleText, mine && { color: 'white' }]}>{item.content}</Text>
+            )}
           </Pressable>
           {!mine && <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>}
         </View>
@@ -343,15 +349,10 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <Icon name="back" />
         </Pressable>
+        {/* 상단은 닉네임만 (알림 꺼둔 방이면 옆에 아이콘) */}
         <Pressable style={styles.person} onPress={() => other && navigation.navigate('UserProfile', { userId: other.userId })}>
-          <Avatar name={other?.userName ?? room.name} uri={otherProfile.data?.profileImageUrl} size={31} />
-          <View>
-            <Text style={styles.personName}>{other?.userName ?? room.name}</Text>
-            <Text style={styles.personSub}>
-              {connected ? '연결됨' : '연결 중…'}
-              {room.notificationMuted ? ' · 알림 꺼짐' : ''}
-            </Text>
-          </View>
+          <Text style={styles.personName} numberOfLines={1}>{other?.userName ?? room.name}</Text>
+          {room.notificationMuted && <Icon name="bellOff" size={15} color={colors.textMuted} />}
         </Pressable>
         <Pressable onPress={() => setMenu((v) => !v)} hitSlop={8}>
           <Text style={{ fontWeight: '800', letterSpacing: 1, color: colors.text }}>•••</Text>
@@ -384,7 +385,10 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.dealTitle} numberOfLines={1}>{board?.title ?? room.productTitle}</Text>
           <Text style={styles.dealSub}>
-            {reservation ? `${RESERVATION_STATUS_LABEL[reservation.status]} · ${reservation.quantity}개 · ${won(reservation.subtotal)}` : board ? `개당 ${won(board.unitPrice)}` : ''}
+            {reservation ? `${reservation.quantity}개 · ${won(reservation.subtotal)}` : board ? `개당 ${won(board.unitPrice)}` : ''}
+            {/* 끝난 거래만 조용히 상태 표시 */}
+            {reservation?.status === 'COMPLETED' && <Text style={styles.dealState}>  ·  거래완료됨</Text>}
+            {reservation?.status === 'CANCELLED' && <Text style={styles.dealState}>  ·  취소됨</Text>}
           </Text>
         </View>
         {dealActions}
@@ -484,14 +488,16 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
 
 const styles = StyleSheet.create({
   header: { height: 58, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  person: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  personName: { fontSize: font.base, fontWeight: '700', color: colors.text },
-  personSub: { fontSize: font.xs, color: '#84939a' },
+  person: { flex: 1, marginHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  personName: { flexShrink: 1, fontSize: font.base, fontWeight: '700', color: colors.text },
   menu: { position: 'absolute', zIndex: 20, right: 12, top: 64, width: 140, padding: 5, borderRadius: 12, borderWidth: 1, borderColor: '#e1e7e9', backgroundColor: 'white', elevation: 6, shadowColor: '#1f414e', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } },
   menuItem: { paddingHorizontal: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#edf1f2' },
   menuText: { fontSize: font.md, color: colors.text },
   deal: { minHeight: 67, paddingHorizontal: 16, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e9eeec' },
   dealTitle: { fontSize: font.md, fontWeight: '700', color: colors.text },
+  dealState: { color: colors.textFaint, fontWeight: '500' },
+  deletedRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  deletedText: { fontSize: font.md, fontStyle: 'italic', color: colors.textMuted },
   dealSub: { color: colors.primaryDark, fontSize: font.xs, fontWeight: '600' },
   dealBtn: { height: 32, paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primaryLight, justifyContent: 'center' },
   dealBtnSoft: { backgroundColor: '#eef2f0' },
