@@ -15,12 +15,12 @@ import { Avatar, BottomSheet, Button, Thumb } from './ui';
 const BUYER_KEYWORDS = (Object.keys(MANNER_KEYWORDS) as MannerKeywordType[]).filter((k) => MANNER_KEYWORDS[k].target === 'BUYER');
 
 /**
- * 판매완료 (모집을 강제로 끝내기).
+ * 거래완료 (모집을 강제로 끝내기).
  * 1) 이 글로 채팅한 사람(수락/거래완료된 참여) 중 실제로 거래한 사람을 여러 명 고름
  *    → 고른 참여는 거래완료(COMPLETED)로 바꿔 서로의 거래 횟수에 반영하고,
  *      고르지 않은 수락 상태 참여는 거래취소(CANCELLED, 채팅방 읽기전용)로 정리한 뒤 게시글은 모집완료로
  * 2) 고른 사람들에게 한 번에 매너 평가 (건너뛰기 가능)
- * 인원이 다 차서 자동으로 모집완료된 경우와 구분하려고 버튼 이름은 '판매완료'
+ * 인원이 다 차서 자동으로 모집완료된 경우와 달리, 방장이 직접 거래를 마무리하는 버튼 ('거래완료')
  */
 export default function SaleCompleteSheet({
   board,
@@ -42,7 +42,7 @@ export default function SaleCompleteSheet({
   const [keywords, setKeywords] = useState<MannerKeywordType[]>([]);
   const [busy, setBusy] = useState(false);
 
-  // board 객체는 판매완료 후 갱신되므로 id 기준으로만 초기화 (안 그러면 평가 단계에서 처음으로 돌아감)
+  // board 객체는 거래완료 후 갱신되므로 id 기준으로만 초기화 (안 그러면 평가 단계에서 처음으로 돌아감)
   const boardId = board?.id;
   useEffect(() => {
     if (!visible || boardId == null) return;
@@ -92,7 +92,7 @@ export default function SaleCompleteSheet({
         setTraded(done);
         setStep('review');
       } else {
-        toast('판매완료로 변경했어요');
+        toast('거래완료로 처리했어요');
         onClose();
       }
     } catch (e) {
@@ -107,7 +107,7 @@ export default function SaleCompleteSheet({
     try {
       const results = await Promise.allSettled(traded.map((r) => mannerApi.review(r.id, keywords)));
       const failed = results.filter((r) => r.status === 'rejected').length;
-      toast(failed ? `${traded.length - failed}명에게 매너 평가를 보냈어요 (${failed}명 실패)` : '판매완료 처리하고 매너 평가를 보냈어요');
+      toast(failed ? `${traded.length - failed}명에게 매너 평가를 보냈어요 (${failed}명 실패)` : '거래완료 처리하고 매너 평가를 보냈어요');
       onClose();
     } finally {
       setBusy(false);
@@ -121,7 +121,7 @@ export default function SaleCompleteSheet({
     <BottomSheet visible={visible} onClose={onClose}>
       {step === 'pick' ? (
         <>
-          <Text style={styles.title}>판매완료</Text>
+          <Text style={styles.title}>거래완료</Text>
           <Text style={styles.sub}>함께 거래한 사람을 모두 선택해주세요. 선택한 사람과의 거래 횟수가 올라가요.</Text>
 
           <View style={styles.board}>
@@ -135,7 +135,7 @@ export default function SaleCompleteSheet({
           {people == null ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 30 }} />
           ) : people.length === 0 ? (
-            <Text style={styles.empty}>이 글로 채팅한 사람이 없어요.{'\n'}판매완료하면 모집만 마감돼요.</Text>
+            <Text style={styles.empty}>이 글로 채팅한 사람이 없어요.{'\n'}거래완료하면 모집만 마감돼요.</Text>
           ) : (
             <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
               {people.map((r) => {
@@ -158,7 +158,7 @@ export default function SaleCompleteSheet({
           )}
 
           {unselectedCount > 0 && <Text style={styles.cancelNote}>선택하지 않은 {unselectedCount}명과의 거래는 취소되고 채팅이 종료돼요.</Text>}
-          <Button label={selected.length ? `${selected.length}명과 판매완료` : '판매완료'} onPress={completeSale} loading={busy} disabled={people == null} style={{ marginTop: 14 }} />
+          <Button label={selected.length ? `${selected.length}명과 거래완료` : '거래완료'} onPress={completeSale} loading={busy} disabled={people == null} style={{ marginTop: 14 }} />
         </>
       ) : (
         <>

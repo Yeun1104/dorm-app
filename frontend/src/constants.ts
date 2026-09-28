@@ -28,8 +28,8 @@ export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
   PENDING: '대기중',
   ACCEPTED: '수락됨',
   REJECTED: '거절됨',
-  COMPLETED: '완료',
-  CANCELLED: '취소',
+  COMPLETED: '거래완료',
+  CANCELLED: '취소됨',
 };
 
 export const MAX_BOARD_IMAGES = 5;

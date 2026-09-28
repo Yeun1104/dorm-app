@@ -137,7 +137,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
     bottom = (
       <View style={styles.ownerActions}>
         <Button
-          label={board.status === 'IN_PROGRESS' ? '판매완료' : '다시 모집'}
+          label={board.status === 'IN_PROGRESS' ? '거래완료' : '다시 모집'}
           variant="soft"
           onPress={board.status === 'IN_PROGRESS' ? () => setSaleSheet(true) : toggleBoardStatus}
           style={{ flex: 1 }}

@@ -21,7 +21,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'PENDING', label: '대기중' },
   { value: 'ACCEPTED', label: '수락됨' },
   { value: 'REJECTED', label: '거절됨' },
-  { value: 'COMPLETED', label: '완료' },
+  { value: 'COMPLETED', label: '거래완료' },
 ];
 
 export default function MyReservationsScreen({ navigation }: ScreenProps<'MyReservations'>) {
