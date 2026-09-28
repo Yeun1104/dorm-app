@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { errorMessage } from '../../api/client';
 import { chatApi } from '../../api/trade';
 import type { ChatRoom } from '../../api/types';
@@ -13,6 +13,9 @@ import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { chatListTime } from '../../utils/format';
+
+/** 채팅방을 왼쪽으로 밀면 나오는 버튼 영역 너비 (버튼 2개) */
+const SWIPE_ACTIONS_W = 150;
 
 export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) {
   const me = useMe();
@@ -35,6 +38,41 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
   const boards = useBoards((rooms.data ?? []).map((r) => r.productId));
 
   const toggle = (id: number) => setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const allIds = (rooms.data ?? []).map((r) => r.id);
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.includes(id));
+  const toggleAll = () => setSelected(allSelected ? [] : allIds);
+
+  // ───── 왼쪽으로 밀면 나오는 버튼 (알림 끄기 / 나가기) ─────
+  const { width } = useWindowDimensions();
+  const rowWidth = width - 36; // 목록 좌우 여백 18씩
+  const swipeRefs = useRef(new Map<number, ScrollView | null>());
+  const closeSwipe = (id: number) => swipeRefs.current.get(id)?.scrollTo({ x: 0, animated: true });
+
+  const toggleMute = async (room: ChatRoom) => {
+    closeSwipe(room.id);
+    const muted = !room.notificationMuted;
+    rooms.setData((list) => list?.map((r) => (r.id === room.id ? { ...r, notificationMuted: muted } : r)) ?? list);
+    try {
+      await chatApi.setMuted(room.id, muted);
+      toast(muted ? '이 채팅방 알림을 껐어요' : '이 채팅방 알림을 켰어요');
+    } catch (e) {
+      rooms.setData((list) => list?.map((r) => (r.id === room.id ? { ...r, notificationMuted: !muted } : r)) ?? list);
+      toast(errorMessage(e));
+    }
+  };
+
+  const leaveOne = async (room: ChatRoom) => {
+    closeSwipe(room.id);
+    const ok = await confirm({ title: '채팅방을 나갈까요?', message: '대화 내용은 복구할 수 없어요.', confirmText: '나가기', danger: true });
+    if (!ok) return;
+    try {
+      await chatApi.leave(room.id);
+      rooms.setData((list) => list?.filter((r) => r.id !== room.id) ?? list);
+      toast('채팅방을 나갔어요');
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
 
   const leaveSelected = async () => {
     const ok = await confirm({ title: `채팅방 ${selected.length}개를 삭제할까요?`, message: '대화 내용은 복구할 수 없어요.', confirmText: '삭제', danger: true });
@@ -52,8 +90,20 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
     const isSelected = selected.includes(item.id);
     const unread = item.unreadCount ?? 0;
     return (
+      <ScrollView
+        ref={(r) => {
+          swipeRefs.current.set(item.id, r);
+        }}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        scrollEnabled={!editing}
+        snapToOffsets={[0, SWIPE_ACTIONS_W]}
+        snapToEnd={false}
+        decelerationRate="fast"
+      >
       <Pressable
-        style={[styles.item, isSelected && styles.itemSelected]}
+        style={[styles.item, { width: rowWidth }, isSelected && styles.itemSelected]}
         onPress={() => (editing ? toggle(item.id) : navigation.navigate('ChatRoom', { roomId: item.id }))}
       >
         {editing && (
@@ -64,7 +114,10 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
         <Thumb uri={boards[item.productId]?.images[0]?.imageUrl} size={60} radius={17} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.row}>
-            <Text style={styles.name} numberOfLines={1}>{other?.userName ?? item.name}</Text>
+            <View style={styles.nameWrap}>
+              <Text style={styles.name} numberOfLines={1}>{other?.userName ?? item.name}</Text>
+              {item.notificationMuted && <Icon name="bellOff" size={13} color={colors.textFaint} />}
+            </View>
             <Text style={styles.time}>{chatListTime(item.lastMessageTime)}</Text>
           </View>
           <Text style={[styles.preview, (!item.lastMessage || unread === 0) && styles.previewRead]} numberOfLines={1}>
@@ -78,6 +131,17 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
           </View>
         )}
       </Pressable>
+      <View style={styles.swipeActions}>
+        <Pressable style={[styles.swipeBtn, { backgroundColor: '#8e9895' }]} onPress={() => toggleMute(item)} accessibilityLabel={item.notificationMuted ? '알림 켜기' : '알림 끄기'}>
+          <Icon name={item.notificationMuted ? 'bell' : 'bellOff'} size={20} color="white" />
+          <Text style={styles.swipeText}>{item.notificationMuted ? '알림 켜기' : '알림 끄기'}</Text>
+        </Pressable>
+        <Pressable style={[styles.swipeBtn, { backgroundColor: colors.danger }]} onPress={() => leaveOne(item)} accessibilityLabel="나가기">
+          <Icon name="exit" size={20} color="white" />
+          <Text style={styles.swipeText}>나가기</Text>
+        </Pressable>
+      </View>
+      </ScrollView>
     );
   };
 
@@ -101,8 +165,8 @@ export default function ChatListScreen({ navigation }: ScreenProps<'ChatList'>) 
         <View style={styles.editBar}>
           <Text style={styles.editCount}>{selected.length}개 선택</Text>
           <View style={styles.editActions}>
-            <Pressable style={[styles.subBtn, !selected.length && { opacity: 0.4 }]} disabled={!selected.length} onPress={() => setSelected([])}>
-              <Text style={styles.subBtnText}>다시 선택</Text>
+            <Pressable style={[styles.subBtn, !allIds.length && { opacity: 0.4 }]} disabled={!allIds.length} onPress={toggleAll}>
+              <Text style={styles.subBtnText}>{allSelected ? '전체 해제' : '전체 선택'}</Text>
             </Pressable>
             <Pressable
               style={styles.subBtn}
@@ -177,6 +241,10 @@ const styles = StyleSheet.create({
   selectCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: '#b9c8ce', alignItems: 'center', justifyContent: 'center' },
   selectCircleOn: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  nameWrap: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  swipeActions: { flexDirection: 'row' },
+  swipeBtn: { width: SWIPE_ACTIONS_W / 2, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  swipeText: { fontSize: 11, fontWeight: '700', color: 'white' },
   name: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: colors.text },
   time: { color: '#9da4a1', fontSize: font.xs },
   preview: { marginTop: 4, marginBottom: 3, fontSize: font.md, color: colors.text },
