@@ -6,7 +6,6 @@ import { errorMessage } from '../../api/client';
 import type { Board, BoardPage } from '../../api/types';
 import { userApi } from '../../api/user';
 import { CompactBoardCard } from '../../components/BoardCard';
-import SaleCompleteSheet from '../../components/SaleCompleteSheet';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
 import { EmptyState, ErrorView, Fab, LoadingView, Screen, SegmentedTabs, SubHeader, Thumb } from '../../components/ui';
@@ -80,7 +79,6 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
   const [filter, setFilter] = useState<StatusFilter>('ALL');
   // ••• 누른 글과 말풍선 위치(누른 지점 바로 아래)
   const [menu, setMenu] = useState<{ board: Board; top: number } | null>(null);
-  const [saleBoard, setSaleBoard] = useState<Board | null>(null);
   const mine = mode === 'mine';
   const boards = mine && filter !== 'ALL' ? paged.boards.filter((b) => (filter === 'IN_PROGRESS' ? b.status === 'IN_PROGRESS' : b.status !== 'IN_PROGRESS')) : paged.boards;
 
@@ -89,6 +87,24 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
   const editBoard = (b: Board) => {
     setMenu(null);
     navigation.navigate('BoardWrite', { boardId: b.id });
+  };
+
+  /** 모집완료: 모집만 마감 (다시 모집중으로 못 돌림). 거래 횟수는 채팅방 '거래완료'에서만 */
+  const closeRecruiting = async (b: Board) => {
+    const ok = await confirm({
+      title: '모집을 마감할까요?',
+      message: '모집완료된 글은 다시 모집중으로 바꿀 수 없어요.\n참여한 사람과의 거래는 각 채팅방에서 거래완료로 마무리해주세요.',
+      confirmText: '모집완료',
+    });
+    if (!ok) return;
+    try {
+      const updated = await boardApi.updateStatus(b.id, 'COMPLETED');
+      invalidateBoard(b.id);
+      paged.setBoards((prev) => prev.map((x) => (x.id === b.id ? { ...x, ...updated } : x)));
+      toast('모집을 마감했어요');
+    } catch (e) {
+      toast(errorMessage(e));
+    }
   };
 
   const deleteBoard = async (b: Board) => {
@@ -155,7 +171,7 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
                 onPress={() => navigation.navigate('BoardDetail', { boardId: item.id })}
                 onMenu={(e) => openMenu(item, e)}
                 onRequests={() => navigation.navigate('ReservationManage', { boardId: item.id })}
-                onSaleComplete={() => setSaleBoard(item)}
+                onClose={() => closeRecruiting(item)}
               />
             ) : (
               <CompactBoardCard
@@ -172,13 +188,6 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
         />
       )}
       {mine && <Fab label="글쓰기" onPress={() => navigation.navigate('BoardWrite')} />}
-
-      <SaleCompleteSheet
-        board={saleBoard}
-        visible={!!saleBoard}
-        onClose={() => setSaleBoard(null)}
-        onDone={(updated) => paged.setBoards((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)))}
-      />
 
       <Modal transparent visible={!!menu} animationType="fade" onRequestClose={() => setMenu(null)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
@@ -201,51 +210,48 @@ function BoardListScreen({ mode, navigation }: { mode: 'liked' | 'mine'; navigat
 
 /**
  * 내가 쓴 글 카드
- * [사진]  ● 모집중                    ⋯
- *         제목 (최대 2줄)
- *         12/30개 · 2시간 전
+ * [사진]  제목                          ⋯
+ *         0/3개 · 3분 전
  *         12,000원 /개
- * ───────────────────────────────────
- * 참여 요청 관리 2 •            거래완료 ›   (모집중일 때만)
+ * ──────────────────┬────────────────────
+ *   참여 요청 관리 2  │      모집완료          (모집중일 때만)
+ * 모집완료 글은 사진을 어둡게 덮고 '모집완료'
  */
 function MyPostCard({
   board,
   onPress,
   onMenu,
   onRequests,
-  onSaleComplete,
+  onClose,
 }: {
   board: Board;
   onPress: () => void;
   onMenu: (e: GestureResponderEvent) => void;
   onRequests: () => void;
-  onSaleComplete: () => void;
+  /** 모집완료 (모집 마감) */
+  onClose: () => void;
 }) {
   const recruiting = board.status === 'IN_PROGRESS';
   const collected = board.totalQuantity - board.remainingQuantity;
   return (
-    <Pressable style={styles.post} onPress={onPress}>
-      <View style={styles.postBody}>
+    <View style={styles.post}>
+      <Pressable style={styles.postBody} onPress={onPress}>
         <View>
-          <Thumb uri={board.images[0]?.imageUrl} size={78} radius={14} />
+          <Thumb uri={board.images[0]?.imageUrl} size={76} radius={14} />
           {!recruiting && (
             <View style={styles.doneCover}>
               <Text style={styles.doneCoverText}>모집완료</Text>
             </View>
           )}
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={styles.cardTop}>
-            <View style={styles.statusRow}>
-              {recruiting && <View style={styles.statusDot} />}
-              <Text style={[styles.status, !recruiting && styles.statusDone]}>{recruiting ? '모집중' : '모집완료'}</Text>
-            </View>
-            <Pressable onPress={onMenu} hitSlop={10} style={styles.more} accessibilityLabel="더보기">
-              <Text style={styles.moreText}>•••</Text>
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+          <View style={styles.titleRow}>
+            <Text style={styles.postTitle} numberOfLines={1}>{board.title}</Text>
+            <Pressable onPress={onMenu} hitSlop={10} style={styles.moreBtn} accessibilityLabel="더보기">
+              <Icon name="moreV" size={18} color={colors.textMuted} strokeWidth={3} />
             </Pressable>
           </View>
-          <Text style={styles.postTitle} numberOfLines={2}>{board.title}</Text>
-          <Text style={styles.postMeta} numberOfLines={1}>
+          <Text style={styles.postMeta}>
             {collected}/{board.totalQuantity}개 · {timeAgo(board.createdAt)}
           </Text>
           <Text style={styles.postPrice}>
@@ -253,21 +259,25 @@ function MyPostCard({
             <Text style={styles.postUnit}> /개</Text>
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       {recruiting && (
         <View style={styles.postActions}>
-          <Pressable style={styles.postAction} onPress={onRequests} hitSlop={6}>
-            <Text style={styles.postActionText}>참여 요청 관리{board.waitingCount > 0 ? ` ${board.waitingCount}` : ''}</Text>
-            {board.waitingCount > 0 && <View style={styles.dot} />}
+          <Pressable style={styles.postAction} onPress={onRequests}>
+            <Text style={styles.postActionText}>참여 요청 관리</Text>
+            {board.waitingCount > 0 && (
+              <View style={styles.countPill}>
+                <Text style={styles.countPillText}>{board.waitingCount}</Text>
+              </View>
+            )}
           </Pressable>
-          <Pressable style={styles.postAction} onPress={onSaleComplete} hitSlop={6}>
-            <Text style={[styles.postActionText, styles.postActionStrong]}>거래완료</Text>
-            <Icon name="chevron" size={14} color={colors.text} />
+          <View style={styles.actionDivider} />
+          <Pressable style={styles.postAction} onPress={onClose}>
+            <Text style={[styles.postActionText, styles.postActionStrong]}>모집완료</Text>
           </Pressable>
         </View>
       )}
-    </Pressable>
+    </View>
   );
 }
 
@@ -280,26 +290,24 @@ export function MyPostsScreen({ navigation }: ScreenProps<'MyPosts'>) {
 }
 
 const styles = StyleSheet.create({
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  post: { marginBottom: 12, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white' },
-  postBody: { flexDirection: 'row', gap: 13 },
-  doneCover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14, backgroundColor: 'rgba(22,29,27,0.45)', alignItems: 'center', justifyContent: 'center' },
+  post: { marginBottom: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'white', overflow: 'hidden' },
+  postBody: { padding: 14, flexDirection: 'row', gap: 14 },
+  doneCover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14, backgroundColor: 'rgba(60,66,64,0.55)', alignItems: 'center', justifyContent: 'center' },
   doneCoverText: { fontSize: font.xs, fontWeight: '800', color: 'white' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
-  status: { fontSize: font.xs, fontWeight: '700', color: colors.primaryDark },
-  statusDone: { color: colors.textFaint },
-  more: { paddingHorizontal: 2 },
-  moreText: { color: colors.textFaint, fontWeight: '800', letterSpacing: 1 },
-  postTitle: { marginTop: 3, fontSize: font.base, lineHeight: 20, fontWeight: '700', color: colors.text },
-  postPrice: { marginTop: 3, fontSize: 15, fontWeight: '800', color: colors.text },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  postTitle: { flex: 1, fontSize: font.base, lineHeight: 20, fontWeight: '700', color: colors.text },
+  // 제목 한 줄 높이(20)에 맞춰 세로 가운데
+  moreBtn: { height: 20, justifyContent: 'center', marginRight: -4 },
+  postMeta: { marginTop: 5, fontSize: font.xs, color: colors.textMuted },
+  postPrice: { marginTop: 4, fontSize: 16, fontWeight: '800', color: colors.text },
   postUnit: { fontSize: font.xs, fontWeight: '500', color: colors.textMuted },
-  postMeta: { marginTop: 4, fontSize: font.xs, color: colors.textMuted },
-  postActions: { marginTop: 12, paddingTop: 11, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.borderLight },
-  postAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  postActions: { height: 46, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.borderLight },
+  postAction: { flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  actionDivider: { width: 1, height: 18, backgroundColor: colors.borderLight },
   postActionText: { fontSize: font.sm, fontWeight: '600', color: colors.textBody },
   postActionStrong: { fontWeight: '800', color: colors.text },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.badge },
+  countPill: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center' },
+  countPillText: { fontSize: 11, fontWeight: '800', color: 'white' },
   bubble: { position: 'absolute', right: 26, width: 110, paddingVertical: 4, borderRadius: 12, backgroundColor: 'white', shadowColor: '#1f414e', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   bubbleTail: { position: 'absolute', top: -6, right: 12, width: 12, height: 12, backgroundColor: 'white', transform: [{ rotate: '45deg' }] },
   bubbleItem: { paddingHorizontal: 16, paddingVertical: 11 },
