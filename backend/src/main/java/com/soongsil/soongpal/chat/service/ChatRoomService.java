@@ -63,7 +63,7 @@ public class ChatRoomService {
         User boardUser = userRepository.findById(findBoard.getUser().getId())
                 .orElseThrow(() -> new ChatException(ChatErrorCode.USER_NOT_FOUND));
 
-        Optional<ChatRoom> chatRoom = chatRoomRepository.existsByTwoUser(findUser.getId(), boardUser.getId());
+        Optional<ChatRoom> chatRoom = chatRoomRepository.existsByTwoUser(findUser.getId(), boardUser.getId(), findBoard.getId());
         if (chatRoom.isPresent()) {
             List<ChatRoomUserResDto> users = chatRoom.get().getChatRoomUsers().stream()
                     .map(ChatRoomUserResDto::from)

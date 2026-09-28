@@ -36,13 +36,16 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
     Optional<ChatRoom> findByBoardId(Long boardId);
 
+    // 1:1 채팅방은 (두 사람, 게시글)마다 하나. 게시글 조건이 없으면 같은 두 사람이 다른 글로 거래할 때
+    // 예전 글의 방이 재사용돼서 채팅방에 엉뚱한 게시글이 뜨고, 방이 2개 이상이면 NonUniqueResult 에러가 남
     @Query("SELECT cr FROM ChatRoom cr " +
             "JOIN cr.chatRoomUsers cru1 " +
             "JOIN cr.chatRoomUsers cru2 " +
             "WHERE cr.type = 'PRIVATE' " +
+            "AND cr.boardId = :boardId " +
             "AND cru1.user.id = :findUser " +
             "AND cru2.user.id = :boardUser " +
             "AND cru1.user.id <> cru2.user.id")
-    Optional<ChatRoom> existsByTwoUser(@Param("findUser") Long findUser, @Param("boardUser") Long boardUserId);
+    Optional<ChatRoom> existsByTwoUser(@Param("findUser") Long findUser, @Param("boardUser") Long boardUserId, @Param("boardId") Long boardId);
 
 }
