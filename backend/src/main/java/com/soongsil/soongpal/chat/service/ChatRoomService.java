@@ -278,19 +278,32 @@ public class ChatRoomService {
         return ChatRoomResDto.of(findChatRoom, findBoard.getTitle(),  findBoard.getId(), findBoard.getTitle(), users, null, null);
     }
 
+    /**
+     * 채팅방 나가기 = "내 채팅 목록에서 삭제".
+     *
+     * - 1:1(PRIVATE) 채팅방: 방 자체는 그대로 두고 내 참여 기록(ChatRoomUser)만 소프트 삭제해서 내 목록에서만 사라지게 함.
+     *   상대방의 채팅 목록/대화 기록에는 영향 없음. (예전엔 PRIVATE는 나가기를 막아놨는데, 지금은 채팅방이 전부
+     *   1:1이라 채팅 목록에서 삭제가 항상 CHAT_ROOM_ACCESS_DENIED로 실패했음)
+     * - GROUP(단체) 채팅방: 예전 동작 그대로 (방장은 못 나감, 참여자는 참여 기록 삭제).
+     *
+     * 게시글이 이미 삭제된 방이어도 나갈 수는 있어야 해서, 게시글 조회 실패로 막지 않음.
+     */
     public ChatRoomResDto leaveChatRoom(Long roomId, Long userId) {
         ChatRoom findChatRoom = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_NOT_FOUND));
 
-        Board findBoard = boardRepository.findById(findChatRoom.getBoardId())
-                .orElseThrow(() -> new BoardException(BoardErrorCode.BOARD_NOT_FOUND));
-
-        if (findChatRoom.getType() == PRIVATE) {
-            throw new ChatException(ChatErrorCode.CHAT_ROOM_ACCESS_DENIED);
-        }
-
         ChatRoomUser roomUser = chatRoomUserRepository.findByChatRoomIdAndUserId(findChatRoom.getId(), userId)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_NOT_JOINED));
+
+        Board findBoard = boardRepository.findById(findChatRoom.getBoardId()).orElse(null);
+        Long boardId = findBoard != null ? findBoard.getId() : findChatRoom.getBoardId();
+        String boardTitle = findBoard != null ? findBoard.getTitle() : null;
+
+        if (findChatRoom.getType() == PRIVATE) {
+            roomUser.softDelete();
+            return ChatRoomResDto.of(findChatRoom, boardTitle, boardId, boardTitle, null, null, null);
+        }
+
         if (roomUser.getRole() == ChatRole.OWNER) {
             throw new ChatException(ChatErrorCode.CHAT_ROOM_OUT_DENIED);
         }
@@ -298,7 +311,7 @@ public class ChatRoomService {
         chatRoomUserRepository.delete(roomUser);
         findChatRoom.removeUser(roomUser);
 
-        return ChatRoomResDto.of(findChatRoom, findBoard.getTitle(),  findBoard.getId(), findBoard.getTitle(), null, null, null);
+        return ChatRoomResDto.of(findChatRoom, boardTitle, boardId, boardTitle, null, null, null);
     }
 
     public void deleteChatRoom(Long roomId, Long userId) {
