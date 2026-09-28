@@ -13,6 +13,7 @@ import {
   TextInputKeyPressEventData,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '../../api/client';
 import { chatApi, mannerApi, profileApi, reservationApi } from '../../api/trade';
@@ -21,7 +22,6 @@ import { useMe } from '../../auth/AuthContext';
 import { useChatSocket } from '../../chat/useChatSocket';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import MannerReviewSheet from '../../components/MannerReviewSheet';
 import { Avatar, ErrorView, LoadingView, Screen, Thumb } from '../../components/ui';
 import { fetchBoardCached, invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
@@ -58,14 +58,21 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const insets = useSafeAreaInsets();
 
   // 방 정보 + 연결된 게시글 + 이 방에 연결된 예약(수량/상태)
+  /**
+   * 이 방의 게시글/예약은 '이 방에 연결된 가장 최근 참여 요청' 기준으로 정함.
+   * 예전 서버는 같은 두 사람의 채팅방을 글과 상관없이 재사용해서(room.productId가 예전 글) 엉뚱한 글이 떴음.
+   * 그런 방에서도 지금 진행 중인 거래의 글이 보이도록, 내가 구매자인 요청 + 내가 방장인 요청을 모두 보고 최신 것을 고름.
+   */
   const info = useFetch(
     async () => {
       const room = await chatApi.room(roomId);
-      const board = await fetchBoardCached(room.productId, true);
-      const seller = board ? isMyBoard(board, me) : false;
-      const list = seller ? await reservationApi.listByBoard(room.productId) : await reservationApi.mine();
-      const reservation = list.find((r) => r.chatRoomId === roomId) ?? null;
-      return { room, board, seller, reservation };
+      const roomBoard = await fetchBoardCached(room.productId, true);
+      const asBuyer = (await reservationApi.mine()).filter((r) => r.chatRoomId === roomId);
+      const asSeller = roomBoard && isMyBoard(roomBoard, me) ? (await reservationApi.listByBoard(room.productId)).filter((r) => r.chatRoomId === roomId) : [];
+      const latest = [...asBuyer, ...asSeller].sort((a, b) => b.id - a.id)[0] ?? null;
+      const board = latest && latest.boardId !== room.productId ? await fetchBoardCached(latest.boardId, true) : roomBoard;
+      const seller = latest ? asSeller.some((r) => r.id === latest.id) : roomBoard ? isMyBoard(roomBoard, me) : false;
+      return { room, board, seller, reservation: latest };
     },
     [roomId],
     { refetchOnFocus: true },
@@ -85,7 +92,6 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const [menu, setMenu] = useState(false);
   // 내 메시지 꾹 누르기(앱)/우클릭(웹) 메뉴 — 누른 위치 근처에 띄움
   const [msgMenu, setMsgMenu] = useState<{ msg: ChatMessage; top: number } | null>(null);
-  const [review, setReview] = useState(false);
   const [reviewed, setReviewed] = useState(true);
 
   const loadPage = useCallback(
@@ -157,10 +163,12 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
 
   // 거래완료된 방이면 내가 이미 매너 평가를 보냈는지 (서버 기준 — 다른 기기에서도 정확)
   const completedReservationId = info.data?.reservation?.status === 'COMPLETED' ? info.data.reservation.id : null;
-  useEffect(() => {
-    if (completedReservationId == null) return;
-    mannerApi.reviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(true));
-  }, [completedReservationId]);
+  useFocusEffect(
+    useCallback(() => {
+      if (completedReservationId == null) return;
+      mannerApi.reviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(true));
+    }, [completedReservationId]),
+  );
 
   // 읽음 처리: 개별 메시지엔 id가 없어서 방의 lastMessageId 기준으로 처리.
   // 들어올 때(+포커스 복귀 시 방 정보 재조회됨) 한 번, 나갈 때 그 사이 받은 메시지까지 한 번 더.
@@ -205,6 +213,7 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const { room, board, seller, reservation } = info.data;
   const other = room.users.find((u) => u.userId !== me.userId);
   const readOnly = reservation?.status === 'CANCELLED';
+  const dealEnded = reservation?.status === 'COMPLETED' || reservation?.status === 'CANCELLED';
   // 신고 대상: 방 참여자 목록의 상대 → 없으면(상대가 나간 방 등) 예약/게시글 정보로
   const reportTarget = other
     ? { userId: other.userId, nickname: other.userName }
@@ -219,14 +228,24 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     invalidateBoard(room.productId);
   };
 
+  /** 매너 평가 화면으로 (내가 방장이면 구매자를, 구매자면 방장을 평가) */
+  const openReview = () => {
+    if (!reservation) return;
+    navigation.navigate('MannerReview', {
+      reservationId: reservation.id,
+      target: seller ? 'BUYER' : 'ORGANIZER',
+      targetName: other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '상대방'),
+    });
+  };
+
   const complete = async () => {
     if (!reservation) return;
-    const ok = await confirm({ title: '거래를 완료할까요?', message: `${reservation.buyerNickname}님 · ${reservation.quantity}개 · ${won(reservation.subtotal)}`, confirmText: '거래완료' });
+    const partner = other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '상대방');
+    const ok = await confirm({ title: '거래를 완료할까요?', message: `${partner}님 · ${reservation.quantity}개 · ${won(reservation.subtotal)}`, confirmText: '거래완료' });
     if (!ok) return;
     try {
       setReservation(await reservationApi.updateStatus(reservation.id, 'COMPLETED'));
-      toast('거래를 완료했어요');
-      setReview(true);
+      openReview();
     } catch (e) {
       toast(errorMessage(e));
       info.reload();
@@ -274,19 +293,23 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   };
 
   // ───────── 상단 거래 카드 ─────────
-  let dealActions: ReactNode = null;
-  if (reservation?.status === 'ACCEPTED' && seller) {
-    dealActions = (
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        <Pressable style={[styles.dealBtn, styles.dealBtnSoft]} onPress={cancel}>
-          <Text style={[styles.dealBtnText, { color: '#67726e' }]}>거래취소</Text>
-        </Pressable>
-        <Pressable style={styles.dealBtn} onPress={complete}>
-          <Text style={styles.dealBtnText}>거래완료</Text>
+  // 게시글 미리보기 바로 아래 버튼 (방장·구매자 모두):
+  // 거래 중이면 '거래완료'(누르면 거래 횟수 반영 + 매너 평가 화면), 끝났는데 평가 전이면 '매너 평가 보내기'
+  const dealButton: ReactNode =
+    reservation?.status === 'ACCEPTED' ? (
+      <View style={styles.dealActionWrap}>
+        <Pressable style={styles.dealAction} onPress={complete}>
+          <Text style={styles.dealActionText}>거래완료</Text>
         </Pressable>
       </View>
-    );
-  }
+    ) : reservation?.status === 'COMPLETED' && !reviewed ? (
+      <View style={styles.dealActionWrap}>
+        <Pressable style={styles.dealAction} onPress={openReview}>
+          <Icon name="star" size={15} color="white" filled />
+          <Text style={styles.dealActionText}>매너 평가 보내기</Text>
+        </Pressable>
+      </View>
+    ) : null;
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const mine = item.senderId === me.userId;
@@ -365,10 +388,21 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
               style={styles.menuItem}
               onPress={() => {
                 setMenu(false);
-                navigation.navigate('Report', { userId: reportTarget.userId, nickname: reportTarget.nickname, boardId: room.productId });
+                navigation.navigate('Report', { userId: reportTarget.userId, nickname: reportTarget.nickname, boardId: board?.id ?? room.productId });
               }}
             >
               <Text style={styles.menuText}>신고하기</Text>
+            </Pressable>
+          )}
+          {seller && reservation?.status === 'ACCEPTED' && (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setMenu(false);
+                cancel();
+              }}
+            >
+              <Text style={styles.menuText}>거래취소</Text>
             </Pressable>
           )}
           <Pressable style={styles.menuItem} onPress={toggleMute}>
@@ -380,30 +414,20 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         </View>
       )}
 
+      {/* 게시글 미리보기 — 끝난 거래면 글씨를 흐리게 하고 상태('거래완료'/'취소됨')만 검정으로 */}
       <Pressable style={styles.deal} onPress={() => navigation.navigate('BoardDetail', { boardId: room.productId })}>
-        <Thumb uri={board?.images[0]?.imageUrl} size={45} radius={10} />
+        <Thumb uri={board?.images[0]?.imageUrl} size={45} radius={10} style={dealEnded ? { opacity: 0.5 } : undefined} />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={styles.dealTitle} numberOfLines={1}>{board?.title ?? room.productTitle}</Text>
-          <Text style={styles.dealSub}>
+          <Text style={[styles.dealTitle, dealEnded && styles.dealFaded]} numberOfLines={1}>{board?.title ?? room.productTitle}</Text>
+          <Text style={[styles.dealSub, dealEnded && styles.dealFaded]}>
             {reservation ? `${reservation.quantity}개 · ${won(reservation.subtotal)}` : board ? `개당 ${won(board.unitPrice)}` : ''}
-            {/* 끝난 거래만 조용히 상태 표시 */}
-            {reservation?.status === 'COMPLETED' && <Text style={styles.dealState}>  ·  거래완료됨</Text>}
+            {reservation?.status === 'COMPLETED' && <Text style={styles.dealState}>  ·  거래완료</Text>}
             {reservation?.status === 'CANCELLED' && <Text style={styles.dealState}>  ·  취소됨</Text>}
           </Text>
         </View>
-        {dealActions}
+        <Icon name="chevron" size={17} color={colors.textFaint} />
       </Pressable>
-
-      {/* 거래완료되면 양쪽 모두에게 매너 평가 안내 */}
-      {reservation?.status === 'COMPLETED' && !reviewed && (
-        <Pressable style={styles.reviewBar} onPress={() => setReview(true)}>
-          <View style={styles.reviewIcon}>
-            <Icon name="star" size={15} color="white" />
-          </View>
-          <Text style={styles.reviewText}>거래가 완료됐어요! {other?.userName ?? '상대방'}님에게 매너 평가를 보내주세요</Text>
-          <Text style={styles.reviewAction}>보내기</Text>
-        </Pressable>
-      )}
+      {dealButton}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={insets.top}>
         <FlatList
@@ -472,16 +496,6 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         )}
       </Modal>
 
-      {reservation && (
-        <MannerReviewSheet
-          visible={review}
-          onClose={() => setReview(false)}
-          reservationId={reservation.id}
-          target={seller ? 'BUYER' : 'ORGANIZER'}
-          targetName={other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '')}
-          onReviewed={() => setReviewed(true)}
-        />
-      )}
     </Screen>
   );
 }
@@ -495,17 +509,14 @@ const styles = StyleSheet.create({
   menuText: { fontSize: font.md, color: colors.text },
   deal: { minHeight: 67, paddingHorizontal: 16, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e9eeec' },
   dealTitle: { fontSize: font.md, fontWeight: '700', color: colors.text },
-  dealState: { color: colors.textFaint, fontWeight: '500' },
+  dealState: { color: colors.text, fontWeight: '800' },
   deletedRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   deletedText: { fontSize: font.md, fontStyle: 'italic', color: colors.textMuted },
   dealSub: { color: colors.primaryDark, fontSize: font.xs, fontWeight: '600' },
-  dealBtn: { height: 32, paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primaryLight, justifyContent: 'center' },
-  dealBtnSoft: { backgroundColor: '#eef2f0' },
-  dealBtnText: { color: 'white', fontSize: font.xs, fontWeight: '700' },
-  reviewBar: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, backgroundColor: '#fff8e3' },
-  reviewIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#f2b84b', alignItems: 'center', justifyContent: 'center' },
-  reviewText: { flex: 1, fontSize: font.xs, lineHeight: 16, fontWeight: '600', color: '#7a6128' },
-  reviewAction: { fontSize: font.sm, fontWeight: '800', color: '#7a6128' },
+  dealFaded: { color: colors.textFaint },
+  dealActionWrap: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e9eeec', backgroundColor: 'white' },
+  dealAction: { height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, backgroundColor: colors.text },
+  dealActionText: { fontSize: font.md, fontWeight: '800', color: 'white' },
   divider: { textAlign: 'center', marginVertical: 12, color: '#8a9490', fontSize: font.xs },
   system: { alignSelf: 'center', marginBottom: 18, paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 16, backgroundColor: '#dcebed' },
   systemText: { color: '#668178', fontSize: font.xs },
