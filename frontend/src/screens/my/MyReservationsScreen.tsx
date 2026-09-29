@@ -21,7 +21,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'PENDING', label: '대기중' },
   { value: 'ACCEPTED', label: '수락됨' },
   { value: 'REJECTED', label: '거절됨' },
-  { value: 'COMPLETED', label: '완료' },
+  { value: 'COMPLETED', label: '거래완료' },
 ];
 
 export default function MyReservationsScreen({ navigation }: ScreenProps<'MyReservations'>) {
@@ -69,9 +69,18 @@ export default function MyReservationsScreen({ navigation }: ScreenProps<'MyRese
             <Text style={styles.actionText}>요청 취소</Text>
           </Pressable>
         )}
-        {(item.status === 'ACCEPTED' || item.status === 'COMPLETED') && item.chatRoomId != null && (
+        {item.status === 'ACCEPTED' && item.chatRoomId != null && (
           <Pressable style={[styles.action, styles.actionGreen]} onPress={() => navigation.navigate('ChatRoom', { roomId: item.chatRoomId! })}>
-            <Text style={[styles.actionText, { color: colors.primaryDark }]}>{item.status === 'COMPLETED' ? '채팅방에서 매너 평가하기' : '채팅방으로 이동'}</Text>
+            <Text style={[styles.actionText, { color: colors.primaryDark }]}>채팅방으로 이동</Text>
+          </Pressable>
+        )}
+        {/* 거래완료된 참여는 바로 매너 평가 화면으로 (구매자 → 총대 평가) */}
+        {item.status === 'COMPLETED' && (
+          <Pressable
+            style={[styles.action, styles.actionGreen]}
+            onPress={() => navigation.navigate('MannerReview', { reservationId: item.id, target: 'ORGANIZER', targetName: board?.authorNickname ?? '방장' })}
+          >
+            <Text style={[styles.actionText, { color: colors.primaryDark }]}>매너 평가하기</Text>
           </Pressable>
         )}
       </Pressable>

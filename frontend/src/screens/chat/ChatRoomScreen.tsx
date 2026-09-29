@@ -1,22 +1,54 @@
-import { ReactNode, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputKeyPressEventData,
+  View,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '../../api/client';
-import { chatApi, mannerApi, reservationApi } from '../../api/trade';
+import { chatApi, mannerApi, profileApi, reservationApi } from '../../api/trade';
 import type { ChatMessage, Reservation } from '../../api/types';
 import { useMe } from '../../auth/AuthContext';
 import { useChatSocket } from '../../chat/useChatSocket';
 import { useConfirm, useToast } from '../../components/Feedback';
 import Icon from '../../components/Icon';
-import MannerReviewSheet from '../../components/MannerReviewSheet';
 import { Avatar, ErrorView, LoadingView, Screen, Thumb } from '../../components/ui';
-import { RESERVATION_STATUS_LABEL } from '../../constants';
 import { fetchBoardCached, invalidateBoard } from '../../hooks/useBoards';
 import { useFetch } from '../../hooks/useFetch';
 import type { ScreenProps } from '../../navigation/types';
 import { colors, font } from '../../theme';
 import { clockTime, parseServerDate, won } from '../../utils/format';
 import { isMyBoard } from '../home/BoardDetailScreen';
+
+/** 메시지에 id가 없어서 (보낸 시각, 보낸 사람, 내용)으로 같은 메시지를 식별 */
+const msgKey = (m: ChatMessage) => `${m.createdAt}|${m.senderId}|${m.content}`;
+
+/** 입력창: 한 줄 높이 × 최대 6줄까지 늘어나고 그 이상은 입력창 안에서 스크롤 */
+const INPUT_LINE = 20;
+const INPUT_PAD = 10;
+const INPUT_MIN = INPUT_LINE + INPUT_PAD * 2;
+const INPUT_MAX = INPUT_LINE * 6 + INPUT_PAD * 2;
+
+// 웹: 입력창(textarea) 스크롤바 숨김 — RN 스타일로는 지정할 수 없어서 CSS 한 줄 주입
+if (Platform.OS === 'web' && typeof document !== 'undefined' && !document.getElementById('hide-textarea-scrollbar')) {
+  const style = document.createElement('style');
+  style.id = 'hide-textarea-scrollbar';
+  style.textContent = 'textarea{scrollbar-width:none;-ms-overflow-style:none}textarea::-webkit-scrollbar{display:none}';
+  document.head.appendChild(style);
+}
+
+/** 안 읽음 숫자를 다시 받아오는 주기 (상대가 읽었는지 반영) */
+const UNREAD_REFRESH_MS = 8000;
 
 export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatRoom'>) {
   const { roomId } = route.params;
@@ -26,18 +58,29 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const insets = useSafeAreaInsets();
 
   // 방 정보 + 연결된 게시글 + 이 방에 연결된 예약(수량/상태)
+  /**
+   * 이 방의 게시글/예약은 '이 방에 연결된 가장 최근 참여 요청' 기준으로 정함.
+   * 예전 서버는 같은 두 사람의 채팅방을 글과 상관없이 재사용해서(room.productId가 예전 글) 엉뚱한 글이 떴음.
+   * 그런 방에서도 지금 진행 중인 거래의 글이 보이도록, 내가 구매자인 요청 + 내가 방장인 요청을 모두 보고 최신 것을 고름.
+   */
   const info = useFetch(
     async () => {
       const room = await chatApi.room(roomId);
-      const board = await fetchBoardCached(room.productId, true);
-      const seller = board ? isMyBoard(board, me) : false;
-      const list = seller ? await reservationApi.listByBoard(room.productId) : await reservationApi.mine();
-      const reservation = list.find((r) => r.chatRoomId === roomId) ?? null;
-      return { room, board, seller, reservation };
+      const roomBoard = await fetchBoardCached(room.productId, true);
+      const asBuyer = (await reservationApi.mine()).filter((r) => r.chatRoomId === roomId);
+      const asSeller = roomBoard && isMyBoard(roomBoard, me) ? (await reservationApi.listByBoard(room.productId)).filter((r) => r.chatRoomId === roomId) : [];
+      const latest = [...asBuyer, ...asSeller].sort((a, b) => b.id - a.id)[0] ?? null;
+      const board = latest && latest.boardId !== room.productId ? await fetchBoardCached(latest.boardId, true) : roomBoard;
+      const seller = latest ? asSeller.some((r) => r.id === latest.id) : roomBoard ? isMyBoard(roomBoard, me) : false;
+      return { room, board, seller, reservation: latest };
     },
     [roomId],
     { refetchOnFocus: true },
   );
+
+  // 상대방 프로필 사진: 채팅방 응답의 users[].profileImage가 비어 있어서 프로필 API로 받음
+  const otherUserId = info.data?.room.users.find((u) => u.userId !== me.userId)?.userId ?? null;
+  const otherProfile = useFetch(() => profileApi.get(otherUserId!), [otherUserId], { enabled: otherUserId != null });
 
   // 메시지: 서버가 최신순(desc)으로 주므로 inverted FlatList에 그대로 사용
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -45,8 +88,10 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const [lastPage, setLastPage] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [text, setText] = useState('');
+  const [inputHeight, setInputHeight] = useState(INPUT_MIN);
   const [menu, setMenu] = useState(false);
-  const [review, setReview] = useState(false);
+  // 내 메시지 꾹 누르기(앱)/우클릭(웹) 메뉴 — 누른 위치 근처에 띄움
+  const [msgMenu, setMsgMenu] = useState<{ msg: ChatMessage; top: number } | null>(null);
   const [reviewed, setReviewed] = useState(true);
 
   const loadPage = useCallback(
@@ -66,18 +111,64 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     [roomId, toast],
   );
 
-  useEffect(() => {
-    loadPage(0);
-  }, [loadPage]);
+  /**
+   * 읽음 표시(메시지 왼쪽 '1'):
+   * 서버의 unreadCount는 '이 메시지 이후를 안 읽은 방 참여자 수'인데 보낸 사람 본인도 포함됨(보내도 내 읽음 위치가 안 움직임).
+   * → 방에 있는 동안 내 읽음 위치를 계속 최신으로 올려두면, 이후 받아오는 숫자는 상대방 기준이 됨.
+   */
+  const markReadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markReadLatest = useCallback(async () => {
+    const r = await chatApi.room(roomId);
+    if (r.lastMessageId) await chatApi.markRead(roomId, r.lastMessageId);
+  }, [roomId]);
+  const scheduleMarkRead = useCallback(() => {
+    if (markReadTimer.current) clearTimeout(markReadTimer.current);
+    markReadTimer.current = setTimeout(() => markReadLatest().catch(() => {}), 400);
+  }, [markReadLatest]);
 
-  const { connected, send } = useChatSocket(roomId, (msg) => setMessages((prev) => [msg, ...prev]));
+  // 내 읽음 위치를 먼저 올린 뒤 첫 페이지를 받아야 숫자에 내가 안 섞임
+  useEffect(() => {
+    markReadLatest()
+      .catch(() => {})
+      .finally(() => loadPage(0));
+    return () => {
+      if (markReadTimer.current) clearTimeout(markReadTimer.current);
+    };
+  }, [loadPage, markReadLatest]);
+
+  // 상대가 읽었는지 주기적으로 반영 (소켓에 읽음 이벤트가 없어서)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      chatApi
+        .messages(roomId, 0)
+        .then((res) => {
+          const fresh = new Map(res.content.map((m) => [msgKey(m), m.unreadCount]));
+          setMessages((prev) => prev.map((m) => (fresh.has(msgKey(m)) ? { ...m, unreadCount: fresh.get(msgKey(m))! } : m)));
+        })
+        .catch(() => {});
+    }, UNREAD_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [roomId]);
+
+  const { connected, send } = useChatSocket(roomId, (msg) => {
+    const mineMsg = msg.senderId === me.userId;
+    setMessages((prev) => [
+      // 내가 보낸 직후엔 서버 숫자에 나도 포함돼 있어서 1 뺌
+      mineMsg ? { ...msg, unreadCount: Math.max(0, (msg.unreadCount ?? 0) - 1) } : msg,
+      // 상대가 보냈다면 그 전 내 메시지는 다 읽은 것
+      ...(mineMsg ? prev : prev.map((m) => (m.senderId === me.userId ? { ...m, unreadCount: 0 } : m))),
+    ]);
+    scheduleMarkRead();
+  });
 
   // 거래완료된 방이면 내가 이미 매너 평가를 보냈는지 (서버 기준 — 다른 기기에서도 정확)
   const completedReservationId = info.data?.reservation?.status === 'COMPLETED' ? info.data.reservation.id : null;
-  useEffect(() => {
-    if (completedReservationId == null) return;
-    mannerApi.reviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(true));
-  }, [completedReservationId]);
+  useFocusEffect(
+    useCallback(() => {
+      if (completedReservationId == null) return;
+      mannerApi.reviewed(completedReservationId).then(setReviewed).catch(() => setReviewed(true));
+    }, [completedReservationId]),
+  );
 
   // 읽음 처리: 개별 메시지엔 id가 없어서 방의 lastMessageId 기준으로 처리.
   // 들어올 때(+포커스 복귀 시 방 정보 재조회됨) 한 번, 나갈 때 그 사이 받은 메시지까지 한 번 더.
@@ -99,8 +190,21 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const onSend = () => {
     const content = text.trim();
     if (!content) return;
-    if (send(content)) setText('');
-    else toast('채팅 서버에 연결 중이에요. 잠시 후 다시 보내주세요');
+    if (send(content)) {
+      setText('');
+      setInputHeight(INPUT_MIN);
+    } else toast('채팅 서버에 연결 중이에요. 잠시 후 다시 보내주세요');
+  };
+
+  // 웹(키보드): Enter = 전송, Shift+Enter = 줄바꿈. 한글 조합 중 Enter는 무시.
+  // 앱(폰 키보드)은 Enter가 줄바꿈이고 전송 버튼으로만 보냄
+  const onInputKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+    if (Platform.OS !== 'web') return;
+    const ne = e.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean; isComposing?: boolean; keyCode?: number };
+    if (ne.key === 'Enter' && !ne.shiftKey && !ne.isComposing && ne.keyCode !== 229) {
+      e.preventDefault();
+      onSend();
+    }
   };
 
   if (info.loading && !info.data) return <LoadingView />;
@@ -109,20 +213,39 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   const { room, board, seller, reservation } = info.data;
   const other = room.users.find((u) => u.userId !== me.userId);
   const readOnly = reservation?.status === 'CANCELLED';
+  const dealEnded = reservation?.status === 'COMPLETED' || reservation?.status === 'CANCELLED';
+  // 신고 대상: 방 참여자 목록의 상대 → 없으면(상대가 나간 방 등) 예약/게시글 정보로
+  const reportTarget = other
+    ? { userId: other.userId, nickname: other.userName }
+    : seller && reservation
+      ? { userId: reservation.buyerId, nickname: reservation.buyerNickname }
+      : board && !seller
+        ? { userId: board.authorId, nickname: board.authorNickname }
+        : null;
 
   const setReservation = (r: Reservation) => {
     info.setData((d) => (d ? { ...d, reservation: { ...d.reservation, ...r } } : d));
     invalidateBoard(room.productId);
   };
 
+  /** 매너 평가 화면으로 (내가 방장이면 구매자를, 구매자면 방장을 평가) */
+  const openReview = () => {
+    if (!reservation) return;
+    navigation.navigate('MannerReview', {
+      reservationId: reservation.id,
+      target: seller ? 'BUYER' : 'ORGANIZER',
+      targetName: other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '상대방'),
+    });
+  };
+
   const complete = async () => {
     if (!reservation) return;
-    const ok = await confirm({ title: '거래를 완료할까요?', message: `${reservation.buyerNickname}님 · ${reservation.quantity}개 · ${won(reservation.subtotal)}`, confirmText: '거래완료' });
+    const partner = other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '상대방');
+    const ok = await confirm({ title: '거래를 완료할까요?', message: `${partner}님 · ${reservation.quantity}개 · ${won(reservation.subtotal)}`, confirmText: '거래완료' });
     if (!ok) return;
     try {
       setReservation(await reservationApi.updateStatus(reservation.id, 'COMPLETED'));
-      toast('거래를 완료했어요');
-      setReview(true);
+      openReview();
     } catch (e) {
       toast(errorMessage(e));
       info.reload();
@@ -170,19 +293,23 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
   };
 
   // ───────── 상단 거래 카드 ─────────
-  let dealActions: ReactNode = null;
-  if (reservation?.status === 'ACCEPTED' && seller) {
-    dealActions = (
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        <Pressable style={[styles.dealBtn, styles.dealBtnSoft]} onPress={cancel}>
-          <Text style={[styles.dealBtnText, { color: '#67726e' }]}>거래취소</Text>
-        </Pressable>
-        <Pressable style={styles.dealBtn} onPress={complete}>
-          <Text style={styles.dealBtnText}>거래완료</Text>
+  // 게시글 미리보기 바로 아래 버튼 (방장·구매자 모두):
+  // 거래 중이면 '거래완료'(누르면 거래 횟수 반영 + 매너 평가 화면), 끝났는데 평가 전이면 '매너 평가 보내기'
+  const dealButton: ReactNode =
+    reservation?.status === 'ACCEPTED' ? (
+      <View style={styles.dealActionWrap}>
+        <Pressable style={styles.dealAction} onPress={complete}>
+          <Text style={styles.dealActionText}>거래완료</Text>
         </Pressable>
       </View>
-    );
-  }
+    ) : reservation?.status === 'COMPLETED' && !reviewed ? (
+      <View style={styles.dealActionWrap}>
+        <Pressable style={styles.dealAction} onPress={openReview}>
+          <Icon name="star" size={15} color="white" filled />
+          <Text style={styles.dealActionText}>매너 평가 보내기</Text>
+        </Pressable>
+      </View>
+    ) : null;
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const mine = item.senderId === me.userId;
@@ -191,14 +318,48 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
     const older = messages[index + 1];
     const olderDate = older ? parseServerDate(older.createdAt)?.toDateString() : null;
     const showDivider = d && d.toDateString() !== olderDate;
+    // 상대가 연달아 보낸 메시지는 첫 메시지에만 프로필 사진 + 닉네임 (날짜가 바뀌면 다시 표시)
+    const firstOfGroup = !mine && (showDivider || older?.senderId !== item.senderId);
+    const openProfile = () => navigation.navigate('UserProfile', { userId: item.senderId });
     return (
       <View>
-        {showDivider && <Text style={styles.divider}>{`${d!.getMonth() + 1}월 ${d!.getDate()}일`}</Text>}
-        <View style={[styles.bubbleRow, mine ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
-          {mine && <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>}
-          <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-            <Text style={[styles.bubbleText, mine && { color: 'white' }]}>{item.content}</Text>
-          </View>
+        {showDivider && <Text style={styles.divider}>{`${d!.getFullYear()}년 ${d!.getMonth() + 1}월 ${d!.getDate()}일`}</Text>}
+        {firstOfGroup && (
+          <Pressable style={styles.senderRow} onPress={openProfile} hitSlop={4}>
+            <Avatar name={item.senderName} uri={otherProfile.data?.profileImageUrl} size={32} />
+            <Text style={styles.senderName}>{item.senderName}</Text>
+          </Pressable>
+        )}
+        <View style={[styles.bubbleRow, mine ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start', paddingLeft: 40 }]}>
+          {mine && (
+            <View style={styles.bubbleMeta}>
+              {(item.unreadCount ?? 0) > 0 && <Text style={styles.unread}>{item.unreadCount}</Text>}
+              <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>
+            </View>
+          )}
+          <Pressable
+            style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+            disabled={!mine || item.deleted}
+            delayLongPress={350}
+            onLongPress={(e) => setMsgMenu({ msg: item, top: e.nativeEvent.pageY })}
+            {...(mine && Platform.OS === 'web'
+              ? {
+                  onContextMenu: (e: { preventDefault: () => void; nativeEvent: { pageY: number } }) => {
+                    e.preventDefault();
+                    setMsgMenu({ msg: item, top: e.nativeEvent.pageY });
+                  },
+                }
+              : {})}
+          >
+            {item.deleted ? (
+              <View style={styles.deletedRow}>
+                <Icon name="alert" size={14} color={mine ? 'rgba(255,255,255,0.85)' : colors.textMuted} />
+                <Text style={[styles.deletedText, mine && { color: 'rgba(255,255,255,0.85)' }]}>삭제된 채팅입니다</Text>
+              </View>
+            ) : (
+              <Text style={[styles.bubbleText, mine && { color: 'white' }]}>{item.content}</Text>
+            )}
+          </Pressable>
           {!mine && <Text style={styles.bubbleTime}>{d ? clockTime(d) : ''}</Text>}
         </View>
       </View>
@@ -211,15 +372,10 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <Icon name="back" />
         </Pressable>
+        {/* 상단은 닉네임만 (알림 꺼둔 방이면 옆에 아이콘) */}
         <Pressable style={styles.person} onPress={() => other && navigation.navigate('UserProfile', { userId: other.userId })}>
-          <Avatar name={other?.userName ?? room.name} size={31} />
-          <View>
-            <Text style={styles.personName}>{other?.userName ?? room.name}</Text>
-            <Text style={styles.personSub}>
-              {connected ? '연결됨' : '연결 중…'}
-              {room.notificationMuted ? ' · 알림 꺼짐' : ''}
-            </Text>
-          </View>
+          <Text style={styles.personName} numberOfLines={1}>{other?.userName ?? room.name}</Text>
+          {room.notificationMuted && <Icon name="bellOff" size={15} color={colors.textMuted} />}
         </Pressable>
         <Pressable onPress={() => setMenu((v) => !v)} hitSlop={8}>
           <Text style={{ fontWeight: '800', letterSpacing: 1, color: colors.text }}>•••</Text>
@@ -227,15 +383,26 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
       </View>
       {menu && (
         <View style={styles.menu}>
-          {other && (
+          {!!reportTarget && (
             <Pressable
               style={styles.menuItem}
               onPress={() => {
                 setMenu(false);
-                navigation.navigate('Report', { userId: other.userId, nickname: other.userName, boardId: room.productId });
+                navigation.navigate('Report', { userId: reportTarget.userId, nickname: reportTarget.nickname, boardId: board?.id ?? room.productId });
               }}
             >
               <Text style={styles.menuText}>신고하기</Text>
+            </Pressable>
+          )}
+          {seller && reservation?.status === 'ACCEPTED' && (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setMenu(false);
+                cancel();
+              }}
+            >
+              <Text style={styles.menuText}>거래취소</Text>
             </Pressable>
           )}
           <Pressable style={styles.menuItem} onPress={toggleMute}>
@@ -247,27 +414,20 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         </View>
       )}
 
+      {/* 게시글 미리보기 — 끝난 거래면 글씨를 흐리게 하고 상태('거래완료'/'취소됨')만 검정으로 */}
       <Pressable style={styles.deal} onPress={() => navigation.navigate('BoardDetail', { boardId: room.productId })}>
-        <Thumb uri={board?.images[0]?.imageUrl} size={45} radius={10} />
+        <Thumb uri={board?.images[0]?.imageUrl} size={45} radius={10} style={dealEnded ? { opacity: 0.5 } : undefined} />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={styles.dealTitle} numberOfLines={1}>{board?.title ?? room.productTitle}</Text>
-          <Text style={styles.dealSub}>
-            {reservation ? `${RESERVATION_STATUS_LABEL[reservation.status]} · ${reservation.quantity}개 · ${won(reservation.subtotal)}` : board ? `개당 ${won(board.unitPrice)}` : ''}
+          <Text style={[styles.dealTitle, dealEnded && styles.dealFaded]} numberOfLines={1}>{board?.title ?? room.productTitle}</Text>
+          <Text style={[styles.dealSub, dealEnded && styles.dealFaded]}>
+            {reservation ? `${reservation.quantity}개 · ${won(reservation.subtotal)}` : board ? `개당 ${won(board.unitPrice)}` : ''}
+            {reservation?.status === 'COMPLETED' && <Text style={styles.dealState}>  ·  거래완료</Text>}
+            {reservation?.status === 'CANCELLED' && <Text style={styles.dealState}>  ·  취소됨</Text>}
           </Text>
         </View>
-        {dealActions}
+        <Icon name="chevron" size={17} color={colors.textFaint} />
       </Pressable>
-
-      {/* 거래완료되면 양쪽 모두에게 매너 평가 안내 */}
-      {reservation?.status === 'COMPLETED' && !reviewed && (
-        <Pressable style={styles.reviewBar} onPress={() => setReview(true)}>
-          <View style={styles.reviewIcon}>
-            <Icon name="star" size={15} color="white" />
-          </View>
-          <Text style={styles.reviewText}>거래가 완료됐어요! {other?.userName ?? '상대방'}님에게 매너 평가를 보내주세요</Text>
-          <Text style={styles.reviewAction}>보내기</Text>
-        </Pressable>
-      )}
+      {dealButton}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={insets.top}>
         <FlatList
@@ -305,8 +465,11 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
               onChangeText={setText}
               placeholder="메시지를 입력하세요"
               placeholderTextColor="#9aa5a1"
-              style={styles.input}
+              style={[styles.input, { height: inputHeight }]}
               multiline
+              onKeyPress={onInputKeyPress}
+              onContentSizeChange={(e) => setInputHeight(Math.min(INPUT_MAX, Math.max(INPUT_MIN, Math.ceil(e.nativeEvent.contentSize.height))))}
+              scrollEnabled={inputHeight >= INPUT_MAX}
             />
             <Pressable style={[styles.send, !text.trim() && { opacity: 0.5 }]} onPress={onSend} disabled={!text.trim()}>
               <Icon name="send" size={18} color="white" />
@@ -315,38 +478,45 @@ export default function ChatRoomScreen({ navigation, route }: ScreenProps<'ChatR
         )}
       </KeyboardAvoidingView>
 
-      {reservation && (
-        <MannerReviewSheet
-          visible={review}
-          onClose={() => setReview(false)}
-          reservationId={reservation.id}
-          target={seller ? 'BUYER' : 'ORGANIZER'}
-          targetName={other?.userName ?? (seller ? reservation.buyerNickname : board?.authorNickname ?? '')}
-          onReviewed={() => setReviewed(true)}
-        />
-      )}
+      <Modal transparent visible={!!msgMenu} animationType="fade" onRequestClose={() => setMsgMenu(null)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMsgMenu(null)} />
+        {msgMenu && (
+          <View style={[styles.msgMenu, { top: Math.max(insets.top + 60, msgMenu.top - 56) }]}>
+            <Pressable
+              style={styles.msgMenuItem}
+              onPress={() => {
+                setMsgMenu(null);
+                // TODO: 백엔드에 메시지 삭제 API(+메시지 id, 소켓으로 삭제 알림)가 생기면 연결
+                toast('전송 취소는 서버 기능이 추가되면 사용할 수 있어요');
+              }}
+            >
+              <Text style={[styles.msgMenuText, { color: colors.danger }]}>전송 취소</Text>
+            </Pressable>
+          </View>
+        )}
+      </Modal>
+
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   header: { height: 58, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  person: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  personName: { fontSize: font.base, fontWeight: '700', color: colors.text },
-  personSub: { fontSize: font.xs, color: '#84939a' },
+  person: { flex: 1, marginHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  personName: { flexShrink: 1, fontSize: font.base, fontWeight: '700', color: colors.text },
   menu: { position: 'absolute', zIndex: 20, right: 12, top: 64, width: 140, padding: 5, borderRadius: 12, borderWidth: 1, borderColor: '#e1e7e9', backgroundColor: 'white', elevation: 6, shadowColor: '#1f414e', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } },
   menuItem: { paddingHorizontal: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#edf1f2' },
   menuText: { fontSize: font.md, color: colors.text },
   deal: { minHeight: 67, paddingHorizontal: 16, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#e9eeec' },
   dealTitle: { fontSize: font.md, fontWeight: '700', color: colors.text },
+  dealState: { color: colors.text, fontWeight: '800' },
+  deletedRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  deletedText: { fontSize: font.md, fontStyle: 'italic', color: colors.textMuted },
   dealSub: { color: colors.primaryDark, fontSize: font.xs, fontWeight: '600' },
-  dealBtn: { height: 32, paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primaryLight, justifyContent: 'center' },
-  dealBtnSoft: { backgroundColor: '#eef2f0' },
-  dealBtnText: { color: 'white', fontSize: font.xs, fontWeight: '700' },
-  reviewBar: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, backgroundColor: '#fff8e3' },
-  reviewIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#f2b84b', alignItems: 'center', justifyContent: 'center' },
-  reviewText: { flex: 1, fontSize: font.xs, lineHeight: 16, fontWeight: '600', color: '#7a6128' },
-  reviewAction: { fontSize: font.sm, fontWeight: '800', color: '#7a6128' },
+  dealFaded: { color: colors.textFaint },
+  dealActionWrap: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e9eeec', backgroundColor: 'white' },
+  dealAction: { height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, backgroundColor: colors.text },
+  dealActionText: { fontSize: font.md, fontWeight: '800', color: 'white' },
   divider: { textAlign: 'center', marginVertical: 12, color: '#8a9490', fontSize: font.xs },
   system: { alignSelf: 'center', marginBottom: 18, paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 16, backgroundColor: '#dcebed' },
   systemText: { color: '#668178', fontSize: font.xs },
@@ -356,8 +526,15 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: 'white', borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: font.base, lineHeight: 20, color: colors.text },
   bubbleTime: { color: '#98a09d', fontSize: 10 },
+  bubbleMeta: { alignItems: 'flex-end' },
+  senderRow: { alignSelf: 'flex-start', marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  senderName: { fontSize: font.sm, fontWeight: '600', color: colors.textBody },
+  msgMenu: { position: 'absolute', right: 20, minWidth: 120, paddingVertical: 4, borderRadius: 12, backgroundColor: 'white', shadowColor: '#1f414e', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  msgMenuItem: { paddingHorizontal: 16, paddingVertical: 12 },
+  msgMenuText: { fontSize: font.md, fontWeight: '600', color: colors.text },
+  unread: { color: '#e6a817', fontSize: 11, fontWeight: '800' },
   inputBar: { paddingHorizontal: 12, paddingTop: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 7, backgroundColor: 'white' },
-  input: { flex: 1, minHeight: 40, maxHeight: 110, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, borderRadius: 20, backgroundColor: colors.inputBg, fontSize: font.base, color: colors.text },
+  input: { flex: 1, paddingHorizontal: 14, paddingTop: INPUT_PAD, paddingBottom: INPUT_PAD, borderRadius: 20, backgroundColor: colors.inputBg, fontSize: font.base, lineHeight: INPUT_LINE, color: colors.text },
   send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   readOnly: { paddingTop: 14, paddingHorizontal: 16, backgroundColor: '#f5f7f6', alignItems: 'center' },
   readOnlyText: { color: colors.textMuted, fontSize: font.sm },

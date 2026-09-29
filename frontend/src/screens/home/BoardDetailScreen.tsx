@@ -1,5 +1,5 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { Dimensions, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import { Dimensions, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { boardApi } from '../../api/board';
 import { errorMessage } from '../../api/client';
@@ -8,7 +8,6 @@ import type { Board, Reservation } from '../../api/types';
 import { useMe } from '../../auth/AuthContext';
 import { boardProgress, BoardStatusChip } from '../../components/BoardCard';
 import { useConfirm, useToast } from '../../components/Feedback';
-import SaleCompleteSheet from '../../components/SaleCompleteSheet';
 import Icon from '../../components/Icon';
 import { Avatar, BottomSheet, Button, CountBadge, ErrorView, LoadingView, ProgressBar, Thumb } from '../../components/ui';
 import { invalidateBoard } from '../../hooks/useBoards';
@@ -48,8 +47,11 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
   const [sheet, setSheet] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
+  // 수량 직접 입력 중인 글자 (포커스 빠질 때 최소~최대로 맞춤)
+  const [qtyText, setQtyText] = useState<string | null>(null);
+  // 참여 요청 중복 전송 방지 (버튼 두 번 빠르게 눌러도 한 번만) — state는 다음 렌더까지 반영이 늦어서 ref로
+  const sending = useRef(false);
   const [menu, setMenu] = useState(false);
-  const [saleSheet, setSaleSheet] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
 
   const toggleLike = useLikeToggle((patch) => setData((d) => (d ? { ...d, board: { ...d.board, ...patch } } : d)));
@@ -70,13 +72,29 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
 
   const openSheet = () => {
     setQuantity(Math.min(Math.max(minQty, 1), board.remainingQuantity));
+    setQtyText(null);
     setSheet(true);
   };
 
+  /** 최소 구매 수량 ~ 남은 수량 사이로 맞춤 */
+  const clampQty = (n: number) => Math.min(board.remainingQuantity, Math.max(minQty, Number.isFinite(n) ? n : minQty));
+  const commitQtyText = () => {
+    if (qtyText == null) return;
+    const n = clampQty(parseInt(qtyText.replace(/[^0-9]/g, ''), 10));
+    if (String(n) !== qtyText) toast(`${minQty}~${board.remainingQuantity}개 사이로 맞췄어요`);
+    setQuantity(n);
+    setQtyText(null);
+  };
+
   const sendRequest = async () => {
+    if (sending.current) return;
+    sending.current = true;
+    // 입력 중이던 숫자가 있으면 그 값을 (범위 맞춰서) 바로 사용
+    const q = qtyText != null ? clampQty(parseInt(qtyText.replace(/[^0-9]/g, ''), 10)) : quantity;
+    commitQtyText();
     setBusy(true);
     try {
-      const r = await reservationApi.create(boardId, quantity);
+      const r = await reservationApi.create(boardId, q);
       setData({ ...data, myReservation: r });
       setSheet(false);
       toast('참여 요청을 보냈어요');
@@ -86,6 +104,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
       toast(errorMessage(e));
     } finally {
       setBusy(false);
+      sending.current = false;
     }
   };
 
@@ -103,13 +122,19 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
     reload();
   };
 
-  const toggleBoardStatus = async () => {
-    const next = board.status === 'IN_PROGRESS' ? 'COMPLETED' : 'IN_PROGRESS';
+  /** 모집완료: 모집만 마감 (다시 모집중으로 못 돌림). 거래 횟수는 채팅방에서 사람마다 '거래완료'를 눌러야 올라감 */
+  const closeRecruiting = async () => {
+    const ok = await confirm({
+      title: '모집을 마감할까요?',
+      message: '모집완료된 글은 다시 모집중으로 바꿀 수 없어요.\n참여한 사람과의 거래는 각 채팅방에서 거래완료로 마무리해주세요.',
+      confirmText: '모집완료',
+    });
+    if (!ok) return;
     try {
-      const updated = await boardApi.updateStatus(boardId, next);
+      const updated = await boardApi.updateStatus(boardId, 'COMPLETED');
       setData({ ...data, board: updated });
       invalidateBoard(boardId);
-      toast(next === 'COMPLETED' ? '모집완료로 변경했어요' : '다시 모집을 시작했어요');
+      toast('모집을 마감했어요');
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -136,12 +161,7 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
   if (mine) {
     bottom = (
       <View style={styles.ownerActions}>
-        <Button
-          label={board.status === 'IN_PROGRESS' ? '판매완료' : '다시 모집'}
-          variant="soft"
-          onPress={board.status === 'IN_PROGRESS' ? () => setSaleSheet(true) : toggleBoardStatus}
-          style={{ flex: 1 }}
-        />
+        {board.status === 'IN_PROGRESS' && <Button label="모집완료" variant="soft" onPress={closeRecruiting} style={{ flex: 1 }} />}
         <View style={{ flex: 2 }}>
           <Button label="참여 요청 관리" onPress={() => navigation.navigate('ReservationManage', { boardId })} />
           <CountBadge count={board.waitingCount} style={{ top: -6, right: -4 }} />
@@ -314,33 +334,51 @@ export default function BoardDetailScreen({ navigation, route }: ScreenProps<'Bo
         {bottom}
       </View>
 
-      {mine && (
-        <SaleCompleteSheet
-          board={board}
-          visible={saleSheet}
-          onClose={() => setSaleSheet(false)}
-          onDone={(updated) => setData({ ...data, board: { ...board, ...updated } })}
-        />
-      )}
-
       <BottomSheet visible={sheet} onClose={() => setSheet(false)}>
         <Text style={styles.sheetTitle}>몇 개 참여할까요?</Text>
         <Text style={styles.sheetSub}>1인당 최소 {minQty}개부터 신청할 수 있어요. (남은 수량 {board.remainingQuantity}개)</Text>
         <View style={styles.qtyControl}>
-          <Pressable style={styles.qtyBtn} onPress={() => setQuantity((q) => Math.max(minQty, q - 1))}>
+          <Pressable
+            style={[styles.qtyBtn, quantity <= minQty && { opacity: 0.35 }]}
+            disabled={quantity <= minQty}
+            onPress={() => {
+              setQtyText(null);
+              setQuantity((q) => Math.max(minQty, q - 1));
+            }}
+          >
             <Text style={styles.qtyBtnText}>−</Text>
           </Pressable>
-          <Text style={styles.qtyValue}>
-            {quantity}
-            <Text style={{ fontSize: font.base }}>개</Text>
-          </Text>
-          <Pressable style={styles.qtyBtn} onPress={() => setQuantity((q) => Math.min(board.remainingQuantity, q + 1))}>
+          {/* 숫자를 누르면 숫자 키패드로 직접 입력 (범위를 넘으면 최소~최대로 맞춤) */}
+          <View style={styles.qtyInputWrap}>
+            <TextInput
+              value={qtyText ?? String(quantity)}
+              onChangeText={(t) => setQtyText(t.replace(/[^0-9]/g, '').slice(0, 4))}
+              onFocus={() => setQtyText(String(quantity))}
+              onBlur={commitQtyText}
+              onSubmitEditing={commitQtyText}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              selectTextOnFocus
+              style={styles.qtyValue}
+            />
+            <Text style={styles.qtyUnit}>개</Text>
+          </View>
+          <Pressable
+            style={[styles.qtyBtn, quantity >= board.remainingQuantity && { opacity: 0.35 }]}
+            disabled={quantity >= board.remainingQuantity}
+            onPress={() => {
+              setQtyText(null);
+              setQuantity((q) => Math.min(board.remainingQuantity, q + 1));
+            }}
+          >
             <Text style={styles.qtyBtnText}>＋</Text>
           </Pressable>
         </View>
         <View style={styles.sheetTotal}>
           <Text style={{ fontSize: font.md, color: colors.textBody }}>예상 결제 금액</Text>
-          <Text style={{ fontSize: font.md, fontWeight: '800' }}>{won(board.unitPrice * quantity)}</Text>
+          <Text style={{ fontSize: font.md, fontWeight: '800' }}>
+            {won(board.unitPrice * (qtyText != null ? clampQty(parseInt(qtyText || '0', 10)) : quantity))}
+          </Text>
         </View>
         <Button label="참여 요청 보내기" onPress={sendRequest} loading={busy} />
         <Text style={styles.sheetNote}>채팅은 방장이 참여 요청을 수락한 뒤 열려요.</Text>
@@ -419,6 +457,8 @@ const styles = StyleSheet.create({
   qtyControl: { marginVertical: 25, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 34 },
   qtyBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#dfe6e3', alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { fontSize: 20, color: colors.text },
-  qtyValue: { minWidth: 60, textAlign: 'center', fontSize: 30, fontWeight: '800', color: colors.text },
+  qtyInputWrap: { flexDirection: 'row', alignItems: 'baseline', gap: 2, borderBottomWidth: 2, borderBottomColor: colors.border },
+  qtyValue: { minWidth: 56, paddingVertical: 2, textAlign: 'center', fontSize: 30, fontWeight: '800', color: colors.text },
+  qtyUnit: { fontSize: font.base, color: colors.text },
   sheetTotal: { marginBottom: 15, padding: 15, borderRadius: 13, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f3f7f5' },
 });

@@ -14,6 +14,7 @@ const MENU: [string, keyof AppStackParamList][] = [
   ['내 참여 신청 내역', 'MyReservations'],
   ['좋아요한 글', 'LikedBoards'],
   ['내가 쓴 글', 'MyPosts'],
+  ['매너 평가', 'MannerReviews'],
   ['기숙사 계정 관리', 'DormAccount'],
 ];
 
@@ -53,16 +54,17 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
         }
       >
         <View style={styles.profileCard}>
-          <Pressable style={styles.profileTop} onPress={() => navigation.navigate('UserProfile', { userId: me.userId })}>
-            <Avatar name={me.nickname} size={58} />
+          <View style={styles.profileTop}>
+            {/* 사진·닉네임 수정은 '프로필 보기'에서 */}
+            <Avatar name={me.nickname} uri={me.profileImageUrl} size={62} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.name} numberOfLines={1}>{me.nickname}</Text>
               <Text style={styles.sub}>거래 {profile.data?.tradeCount ?? 0}회</Text>
             </View>
-            <View style={styles.profileBtn}>
+            <Pressable style={styles.profileBtn} onPress={() => navigation.navigate('UserProfile', { userId: me.userId })}>
               <Text style={styles.profileBtnText}>프로필 보기</Text>
-            </View>
-          </Pressable>
+            </Pressable>
+          </View>
           {profile.data && (
             <View style={styles.manner}>
               <Text style={styles.mannerLabel}>받은 매너 평가</Text>
@@ -100,6 +102,7 @@ export default function MyPageScreen({ navigation }: ScreenProps<'MyPage'>) {
 
         <Text style={styles.version}>나눠도 v1.0.0 · 더 편리한 생활을 돕습니다</Text>
       </ScrollView>
+
     </Screen>
   );
 }
@@ -108,7 +111,7 @@ const styles = StyleSheet.create({
   settings: { color: '#75807c', fontSize: font.md },
   profileCard: { padding: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 22, backgroundColor: 'white' },
   profileTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  name: { fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
+  name: { flexShrink: 1, fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   sub: { marginTop: 3, color: colors.textMuted, fontSize: font.sm },
   profileBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: '#f2f5f4' },
   profileBtnText: { fontSize: font.xs, fontWeight: '700', color: colors.textBody },

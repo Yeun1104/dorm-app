@@ -28,6 +28,10 @@ export type AppStackParamList = {
 
   // 공통
   UserProfile: { userId: number };
+  /** 다른 사용자가 쓴 글 전체 (메인 목록 모양) */
+  UserBoards: { userId: number };
+  /** 매너 평가 보내기 (target: 평가받는 사람의 역할) */
+  MannerReview: { reservationId: number; target: 'BUYER' | 'ORGANIZER'; targetName: string };
   Report: { userId: number; nickname: string; boardId?: number };
 
   // 기숙사생활
@@ -54,6 +58,8 @@ export type AppStackParamList = {
   MyReservations: undefined;
   LikedBoards: undefined;
   MyPosts: undefined;
+  /** 거래완료한 상대에게 보낼/보낸 매너 평가 */
+  MannerReviews: undefined;
   DormAccount: undefined;
   Settings: undefined;
   NotificationSettings: undefined;

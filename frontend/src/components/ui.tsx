@@ -54,7 +54,8 @@ export function SubHeader({ title, subtitle, action, onBack }: { title: string; 
       <Pressable style={s.subBack} onPress={onBack ?? (() => nav.goBack())} hitSlop={8}>
         <Icon name="back" size={22} />
       </Pressable>
-      <View style={s.subTitleWrap}>
+      {/* 제목은 헤더 정가운데 고정 — 오른쪽 버튼(예: '전체 지우기')이 생겨도 밀리지 않게 */}
+      <View style={s.subTitleWrap} pointerEvents="none">
         <Text style={s.subTitle} numberOfLines={1}>{title}</Text>
         {!!subtitle && <Text style={s.subSubtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
@@ -169,10 +170,15 @@ export function CountBadge({ count, style }: { count: number; style?: StyleProp<
 
 // ───────── 아바타 / 썸네일 ─────────
 
-export function Avatar({ name, size = 39 }: { name?: string | null; size?: number }) {
+/** 프로필 사진이 있으면 사진, 없으면(기본 이미지) 닉네임 첫 글자 */
+export function Avatar({ name, size = 39, uri }: { name?: string | null; size?: number; uri?: string | null }) {
   return (
     <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[s.avatarText, { fontSize: size * 0.36 }]}>{(name ?? '?').slice(0, 1)}</Text>
+      {uri ? (
+        <Image source={{ uri }} style={{ width: size, height: size }} contentFit="cover" />
+      ) : (
+        <Text style={[s.avatarText, { fontSize: size * 0.36 }]}>{(name ?? '?').slice(0, 1)}</Text>
+      )}
     </View>
   );
 }
@@ -425,12 +431,12 @@ export const s = StyleSheet.create({
   eyebrow: { color: colors.textSub, fontSize: font.xs, fontWeight: '600', marginBottom: 2 },
   pageTitle: { fontSize: font.title, fontWeight: '800', color: colors.text, letterSpacing: -0.8 },
 
-  subHeader: { height: 64, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.borderLight, backgroundColor: 'white' },
-  subBack: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f2f5f3', alignItems: 'center', justifyContent: 'center' },
-  subTitleWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
+  subHeader: { height: 64, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderLight, backgroundColor: 'white' },
+  subBack: { zIndex: 1, width: 38, height: 38, borderRadius: 19, backgroundColor: '#f2f5f3', alignItems: 'center', justifyContent: 'center' },
+  subTitleWrap: { position: 'absolute', left: 96, right: 96, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   subTitle: { fontSize: 17, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
   subSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: font.xs },
-  subAction: { minWidth: 38, alignItems: 'flex-end' },
+  subAction: { zIndex: 1, minWidth: 38, maxWidth: 90, alignItems: 'flex-end' },
   headerAdd: { height: 33, paddingHorizontal: 10, flexDirection: 'row', gap: 3, alignItems: 'center', borderRadius: 10, backgroundColor: colors.primary },
   headerAddText: { color: 'white', fontSize: font.xs, fontWeight: '700' },
 
@@ -446,7 +452,7 @@ export const s = StyleSheet.create({
   countBadge: { position: 'absolute', minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.badge, alignItems: 'center', justifyContent: 'center' },
   countBadgeText: { color: 'white', fontSize: 10, fontWeight: '700' },
 
-  avatar: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#d9edf3' },
+  avatar: { overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#d9edf3' },
   avatarText: { color: colors.primaryDeep, fontWeight: '800' },
 
   progressTrack: { overflow: 'hidden', borderRadius: 10, backgroundColor: '#e8f1f3' },

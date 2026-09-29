@@ -115,6 +115,10 @@ export interface ChatRoom {
 }
 
 export interface ChatMessage {
+  /** TODO(백엔드): 전송 취소/답장에 필요. 지금은 응답에 없음 */
+  id?: number;
+  /** TODO(백엔드): 전송 취소된 메시지면 true → '삭제된 채팅입니다'로 표시 */
+  deleted?: boolean;
   roomId: number;
   senderId: number;
   senderName: string;
@@ -137,9 +141,23 @@ export type MannerKeywordType =
   | 'BUYER_FAST_PAYMENT'
   | 'BUYER_PUNCTUAL'
   | 'BUYER_GOOD_CHAT_MANNER'
+  | 'BUYER_KIND'
+  | 'BUYER_QUICK_REPLY'
+  | 'BUYER_ON_TIME_PICKUP'
+  | 'BUYER_CLEAR_COMMUNICATION'
+  | 'BUYER_FLEXIBLE'
+  | 'BUYER_POLITE'
+  | 'BUYER_RECOMMEND'
   | 'ORGANIZER_CLEAN_PACKAGING'
   | 'ORGANIZER_FAST_SETTLEMENT'
-  | 'ORGANIZER_FAST_REPLY';
+  | 'ORGANIZER_FAST_REPLY'
+  | 'ORGANIZER_KIND'
+  | 'ORGANIZER_PUNCTUAL'
+  | 'ORGANIZER_ACCURATE_INFO'
+  | 'ORGANIZER_FAIR_PRICE'
+  | 'ORGANIZER_EASY_PICKUP'
+  | 'ORGANIZER_CLEAR_NOTICE'
+  | 'ORGANIZER_RECOMMEND';
 
 export interface MannerReviewRes {
   id: number;
@@ -179,6 +197,8 @@ export interface UserInfo {
   nickname: string;
   email: string;
   kakaoId: string;
+  /** 앱에서 직접 올린 프로필 사진 (없으면 null → 기본 이미지) */
+  profileImageUrl: string | null;
 }
 
 export interface BoardSummary {
@@ -194,6 +214,7 @@ export interface BoardSummary {
 export interface Profile {
   userId: number;
   nickname: string;
+  profileImageUrl: string | null;
   tradeCount: number;
   topMannerBadges: MannerBadge[];
   /** 기숙사 계정 연동 여부 (인증 배지) */
