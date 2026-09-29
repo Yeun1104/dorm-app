@@ -14,7 +14,8 @@ public enum BoardErrorCode {
     INVALID_BOARD_DATA(HttpStatus.BAD_REQUEST, "유효하지 않은 게시글 데이터입니다."),
     BOARD_ALREADY_DELETED(HttpStatus.CONFLICT, "이미 삭제된 게시글입니다."),
     BOARD_FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "게시글 파일 업로드 개수를 초과했습니다."),
-    LIKE_NOT_FOUND(HttpStatus.NOT_FOUND, "좋아요를 찾을 수 없습니다.");
+    LIKE_NOT_FOUND(HttpStatus.NOT_FOUND, "좋아요를 찾을 수 없습니다."),
+    BOARD_REOPEN_NOT_ALLOWED(HttpStatus.CONFLICT, "모집완료된 글은 다시 모집중으로 바꿀 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

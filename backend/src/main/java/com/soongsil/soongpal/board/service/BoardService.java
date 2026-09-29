@@ -173,6 +173,11 @@ public class BoardService {
             throw new BoardException(BoardErrorCode.BOARD_UPDATE_DENIED);
         }
 
+        // 모집완료된 글은 다시 모집중으로 되돌릴 수 없음
+        if (findBoard.getStatus() == BoardStatus.COMPLETED && statusUpdateDto.getStatus() == BoardStatus.IN_PROGRESS) {
+            throw new BoardException(BoardErrorCode.BOARD_REOPEN_NOT_ALLOWED);
+        }
+
         findBoard.updateStatus(statusUpdateDto.getStatus());
 
         return toBoardResDto(findBoard, userId);
