@@ -125,6 +125,12 @@ public class NotificationService {
         notificationRepository.delete(notification);
     }
 
+    /** 알림 전체 삭제. 매번 하나씩 지우지 않아도 되게. */
+    @Transactional
+    public void deleteAllNotifications(Long userId) {
+        notificationRepository.deleteByRecipientId(userId);
+    }
+
     @Transactional(readOnly = true)
     public NotificationPreferenceResDto getPreference(Long userId) {
         return preferenceRepository.findByUserId(userId)
