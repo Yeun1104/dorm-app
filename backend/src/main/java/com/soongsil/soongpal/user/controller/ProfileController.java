@@ -39,6 +39,14 @@ public class ProfileController {
         return new ResponseEntity<>(new CommonResDto<>("프로필 이미지가 변경되었습니다.", Map.of("profileImageUrl", url)), HttpStatus.OK);
     }
 
+    @Operation(summary = "내 프로필 이미지 삭제(기본 이미지로 되돌림)")
+    @DeleteMapping("/api/users/me/profile-image")
+    public ResponseEntity<CommonResDto<Void>> deleteMyProfileImage() {
+        Long userId = getUserId();
+        profileService.deleteMyProfileImage(userId);
+        return new ResponseEntity<>(new CommonResDto<>("프로필 이미지가 기본 이미지로 변경되었습니다.", null), HttpStatus.OK);
+    }
+
     private Long getUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
