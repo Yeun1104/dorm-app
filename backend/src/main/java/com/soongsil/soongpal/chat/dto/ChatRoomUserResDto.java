@@ -20,6 +20,7 @@ public class ChatRoomUserResDto {
         return ChatRoomUserResDto.builder()
                 .userId(roomUser.getUser().getId())
                 .userName(roomUser.getUser().getNickName())
+                .profileImage(roomUser.getUser().getProfileImageUrl())
                 .build();
     }
 }

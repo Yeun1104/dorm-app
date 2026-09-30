@@ -7,6 +7,7 @@ import com.soongsil.soongpal.chat.domain.ChatMessage;
 import com.soongsil.soongpal.chat.domain.ChatRole;
 import com.soongsil.soongpal.chat.domain.ChatRoom;
 import com.soongsil.soongpal.chat.domain.ChatRoomUser;
+import com.soongsil.soongpal.chat.dto.ChatReadReceiptDto;
 import com.soongsil.soongpal.chat.dto.ChatRoomCreateReqDto;
 import com.soongsil.soongpal.chat.dto.ChatRoomResDto;
 import com.soongsil.soongpal.chat.dto.ChatRoomUserResDto;
@@ -24,6 +25,7 @@ import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,7 @@ public class ChatRoomService {
     private final ChatRoomUserRepository chatRoomUserRepository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ChatRoomResDto createPrivateChatRoom(ChatRoomCreateReqDto dto, Long userId) {
         User findUser = userRepository.findById(userId)
@@ -327,11 +330,17 @@ public class ChatRoomService {
         chatRoom.softDelete();
     }
 
+    /**
+     * 읽음 처리 + 상대에게 실시간 읽음 이벤트 발행(/topic/{roomId}/read).
+     * 프론트가 이 이벤트를 받으면, 8초마다 폴링하지 않고도 상대가 읽은 순간 바로 안읽음 뱃지를 줄일 수 있음.
+     */
     public void updateLastReadMessage(Long roomId, Long userId, Long messageId) {
         ChatRoomUser roomUser = chatRoomUserRepository.findByChatRoomIdAndUserId(roomId, userId)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_NOT_JOINED));
 
         roomUser.updateLastReadMessage(messageId);
+
+        messagingTemplate.convertAndSend("/topic/" + roomId + "/read", new ChatReadReceiptDto(roomId, userId, messageId));
     }
 
     private LastMessageDto toLastMessageDto(LastMessageProjection projection) {

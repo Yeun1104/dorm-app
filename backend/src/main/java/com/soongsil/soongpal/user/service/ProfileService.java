@@ -113,6 +113,26 @@ public class ProfileService {
         return newUrl;
     }
 
+    /** 프로필 이미지를 기본 이미지(null)로 되돌림. S3에 있던 파일도 같이 지움. */
+    @Transactional
+    public void deleteMyProfileImage(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+
+        String oldUrl = user.getProfileImageUrl();
+        if (oldUrl == null) {
+            return; // 이미 기본 이미지 상태면 조용히 끝냄 (프론트가 매번 에러 처리 안 해도 되게)
+        }
+
+        user.updateProfileImageUrl(null);
+
+        try {
+            s3Uploader.deleteFile(oldUrl);
+        } catch (Exception e) {
+            log.warn("프로필 이미지 삭제 실패 (DB상 기본 이미지로는 바뀜): {}", oldUrl, e);
+        }
+    }
+
     private void validateProfileImage(MultipartFile image) {
         if (image == null || image.isEmpty() || image.getSize() > MAX_PROFILE_IMAGE_BYTES) {
             throw new UserException(UserErrorCode.PROFILE_IMAGE_INVALID);

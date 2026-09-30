@@ -66,6 +66,24 @@ public class ReservationController {
         return new ResponseEntity<>(new CommonResDto<>("참여 요청 목록 조회 성공", result), HttpStatus.OK);
     }
 
+    @Operation(summary = "내 글 전체의 대기중인 참여 요청 모아보기",
+            description = "글마다 따로 안 불러도 되게, 내가 방장인 모든 글의 PENDING 요청을 한 번에 반환. 참여요청 관리 탭 상단(전체 보기)에서 씀.")
+    @GetMapping("/api/reservations/pending-requests")
+    public ResponseEntity<CommonResDto<List<ReservationResDto>>> getPendingRequestsForMyBoards() {
+        Long userId = getUserId();
+        List<ReservationResDto> result = reservationService.getPendingRequestsForMyBoards(userId);
+        return new ResponseEntity<>(new CommonResDto<>("대기중인 참여 요청 모아보기 성공", result), HttpStatus.OK);
+    }
+
+    @Operation(summary = "매너평가 안 남긴 거래 모아보기",
+            description = "내가 구매자·방장으로 참여한 거래완료 건 중, 아직 매너평가를 안 남긴 것만 반환.")
+    @GetMapping("/api/reservations/pending-manner-reviews")
+    public ResponseEntity<CommonResDto<List<ReservationResDto>>> getPendingMannerReviews() {
+        Long userId = getUserId();
+        List<ReservationResDto> result = reservationService.getPendingMannerReviews(userId);
+        return new ResponseEntity<>(new CommonResDto<>("매너평가 대기 목록 조회 성공", result), HttpStatus.OK);
+    }
+
     @Operation(summary = "내 참여 요청 목록 조회")
     @GetMapping("/api/reservations/mine")
     public ResponseEntity<CommonResDto<List<ReservationResDto>>> getMyReservations() {

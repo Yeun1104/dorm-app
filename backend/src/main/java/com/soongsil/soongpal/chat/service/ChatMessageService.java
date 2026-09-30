@@ -32,8 +32,11 @@ public class ChatMessageService {
 
         Page<ChatMessageResDto> messages = chatMessageRepository.findByChatRoomId(roomId, pageable)
                 .map((ChatMessage message) -> {
-                    Integer unreadCount = chatRoomUserRepository.countUnreadUsers(roomId, message.getId());
-                    return ChatMessageResDto.from(message, unreadCount);
+                    Integer unreadCount = chatRoomUserRepository.countUnreadUsers(roomId, message.getId(), message.getSender().getId());
+                    ChatMessage replyToMessage = message.getReplyToMessageId() == null
+                            ? null
+                            : chatMessageRepository.findById(message.getReplyToMessageId()).orElse(null);
+                    return ChatMessageResDto.from(message, unreadCount, replyToMessage);
                 });
         return ChatPageResDto.from(messages);
     }

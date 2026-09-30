@@ -60,6 +60,14 @@ public class NotificationController {
         return new ResponseEntity<>(new CommonResDto<>("알림을 삭제했습니다.", null), HttpStatus.OK);
     }
 
+    @Operation(summary = "알림 전체 삭제", description = "내 알림함을 통째로 비움. 되돌릴 수 없음.")
+    @DeleteMapping("/api/notifications")
+    public ResponseEntity<CommonResDto<Void>> deleteAllNotifications() {
+        Long userId = getUserId();
+        notificationService.deleteAllNotifications(userId);
+        return new ResponseEntity<>(new CommonResDto<>("알림을 모두 삭제했습니다.", null), HttpStatus.OK);
+    }
+
     @Operation(summary = "알림 카테고리별 설정 조회", description = "설정을 만든 적 없으면 전부 true(기본 허용)로 내려옴.")
     @GetMapping("/api/notifications/preference")
     public ResponseEntity<CommonResDto<NotificationPreferenceResDto>> getPreference() {
