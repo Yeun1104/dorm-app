@@ -17,7 +17,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     List<Reservation> findByBuyerId(Long buyerId);
 
+    List<Reservation> findByBuyerIdAndStatus(Long buyerId, ReservationStatus status);
+
     List<Reservation> findByBoardIdAndStatus(Long boardId, ReservationStatus status);
+
+    /**
+     * 내가 방장인 글들 전체에서 특정 상태인 예약 목록을 한 번에 조회.
+     * - PENDING으로 부르면: 참여요청 관리 탭에서 "내 글 전체"의 대기중인 요청을 한 번에 모아보는 용도
+     * - COMPLETED로 부르면: 매너평가 대상(판매자 입장) 모아보는 용도
+     */
+    List<Reservation> findByBoard_UserIdAndStatus(Long ownerId, ReservationStatus status);
 
     long countByBoardIdAndStatus(Long boardId, ReservationStatus status);
 

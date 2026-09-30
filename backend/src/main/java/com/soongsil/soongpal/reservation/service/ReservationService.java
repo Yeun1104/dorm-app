@@ -7,6 +7,7 @@ import com.soongsil.soongpal.chat.dto.ChatRoomCreateReqDto;
 import com.soongsil.soongpal.chat.dto.ChatRoomResDto;
 import com.soongsil.soongpal.chat.service.ChatRoomService;
 import com.soongsil.soongpal.common.exception.*;
+import com.soongsil.soongpal.manner.repository.MannerReviewRepository;
 import com.soongsil.soongpal.notification.domain.NotificationType;
 import com.soongsil.soongpal.notification.service.NotificationService;
 import com.soongsil.soongpal.report.domain.ReportCategory;
@@ -23,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -48,6 +50,7 @@ public class ReservationService {
     private final ChatRoomService chatRoomService;
     private final ReportRepository reportRepository;
     private final NotificationService notificationService;
+    private final MannerReviewRepository mannerReviewRepository;
 
     /** API 1: 참여 요청 (구매자 → 방장). 이 시점엔 채팅방도 안 생기고 수량도 안 깎임. */
     @Transactional
@@ -196,6 +199,39 @@ public class ReservationService {
 
         return reservationRepository.findByBoardId(boardId).stream()
                 .map(this::toResDtoWithBuyerProfile)
+                .toList();
+    }
+
+    /**
+     * 내가 방장인 글 "전체"에 걸쳐 대기중인(PENDING) 참여 요청을 한 번에 모아서 조회.
+     * 예전엔 글마다 GET /api/board/{boardId}/reservations를 따로 불러야 했는데, 그걸 한 번에 합친 것.
+     */
+    @Transactional(readOnly = true)
+    public List<ReservationResDto> getPendingRequestsForMyBoards(Long userId) {
+        return reservationRepository.findByBoard_UserIdAndStatus(userId, ReservationStatus.PENDING).stream()
+                .map(this::toResDtoWithBuyerProfile)
+                .toList();
+    }
+
+    /**
+     * 내가 구매자 또는 방장(판매자)으로 참여한 거래완료(COMPLETED) 건 중, 내가 아직 매너평가를 안 남긴 것만 모아서 조회.
+     * 예전엔 건마다 GET /api/reservations/{id}/manner-review/status를 따로 불러야 했는데, 그걸 한 번에 합친 것.
+     */
+    @Transactional(readOnly = true)
+    public List<ReservationResDto> getPendingMannerReviews(Long userId) {
+        List<Reservation> asBuyer = reservationRepository.findByBuyerIdAndStatus(userId, ReservationStatus.COMPLETED);
+        List<Reservation> asSeller = reservationRepository.findByBoard_UserIdAndStatus(userId, ReservationStatus.COMPLETED);
+
+        List<Reservation> all = new ArrayList<>(asBuyer);
+        for (Reservation r : asSeller) {
+            if (all.stream().noneMatch(existing -> existing.getId().equals(r.getId()))) {
+                all.add(r);
+            }
+        }
+
+        return all.stream()
+                .filter(r -> !mannerReviewRepository.existsByReservationIdAndReviewerId(r.getId(), userId))
+                .map(ReservationResDto::from)
                 .toList();
     }
 
