@@ -18,5 +18,6 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
     Page<Board> findByCategoryAndStatus(BoardCategory category, BoardStatus status, Pageable pageable);
     Page<Board> findByTitleContainingIgnoreCase(String keyword, Pageable pageable);
     Page<Board> findByUser(User user, Pageable pageable);
+    Page<Board> findByUserAndStatus(User user, BoardStatus status, Pageable pageable);
     List<Board> findAllByUser(User user);
 }

@@ -1,5 +1,6 @@
 package com.soongsil.soongpal.user.controller;
 
+import com.soongsil.soongpal.board.domain.BoardStatus;
 import com.soongsil.soongpal.board.dto.BoardPageResDto;
 import com.soongsil.soongpal.common.dto.CommonErrorDto;
 import com.soongsil.soongpal.common.dto.CommonResDto;
@@ -38,15 +39,18 @@ public class MyPageController {
         return new ResponseEntity<>(new CommonResDto<>("좋아요한 게시글 조회 성공", dto), HttpStatus.OK);
     }
 
-    @Operation(summary = "내가 쓴 글 조회", description = "로그인한 사용자가 작성한 게시글을 조회합니다.")
+    @Operation(summary = "내가 쓴 글 조회", description = "로그인한 사용자가 작성한 게시글을 조회합니다. status를 주면 그 상태(IN_PROGRESS/COMPLETED)만 걸러서 조회함 - 생략하면 전체.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "작성한 게시글 조회 성공", content = @Content(schema = @Schema(implementation = CommonResDto.class))),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 사용자의 데이터 조회", content = @Content(schema = @Schema(implementation = CommonErrorDto.class)))
     })
     @GetMapping("/posts")
-    public ResponseEntity<CommonResDto<BoardPageResDto>> getMyBoards(@RequestParam(defaultValue = "0") int page) {
+    public ResponseEntity<CommonResDto<BoardPageResDto>> getMyBoards(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) BoardStatus status
+    ) {
         Long userId = getUserId();
-        BoardPageResDto dto = myPageService.getMyBoards(userId, page);
+        BoardPageResDto dto = myPageService.getMyBoards(userId, page, status);
         return new ResponseEntity<>(new CommonResDto<>("작성한 게시글 조회 성공", dto), HttpStatus.OK);
     }
 

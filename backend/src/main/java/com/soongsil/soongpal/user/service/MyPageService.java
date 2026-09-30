@@ -1,6 +1,7 @@
 package com.soongsil.soongpal.user.service;
 
 import com.soongsil.soongpal.board.domain.Board;
+import com.soongsil.soongpal.board.domain.BoardStatus;
 import com.soongsil.soongpal.board.dto.BoardPageResDto;
 import com.soongsil.soongpal.board.dto.BoardResDto;
 import com.soongsil.soongpal.board.repository.BoardRepository;
@@ -41,11 +42,17 @@ public class MyPageService {
         return BoardPageResDto.from(likedBoards);
     }
 
-    public BoardPageResDto getMyBoards(Long userId, int page) {
+    /** status를 안 주면(null) 전체, 주면(모집중/모집완료 등) 그 상태만 필터링해서 조회. */
+    public BoardPageResDto getMyBoards(Long userId, int page, BoardStatus status) {
         User findUser = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
         Pageable pageable = PageRequest.of(page, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<BoardResDto> boards = boardRepository.findByUser(findUser, pageable)
+
+        Page<Board> boardsPage = status == null
+                ? boardRepository.findByUser(findUser, pageable)
+                : boardRepository.findByUserAndStatus(findUser, status, pageable);
+
+        Page<BoardResDto> boards = boardsPage
                 .map(b -> toBoardResDto(b, userId, likeRepository.existsByBoardIdAndUserId(b.getId(), userId)));
         return BoardPageResDto.from(boards);
     }
