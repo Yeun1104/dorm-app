@@ -19,11 +19,15 @@ public class ChatMessageReqDto {
     @NotBlank
     private String content;
 
+    @Schema(description = "답장 대상 메시지 id (일반 메시지면 생략)", example = "128")
+    private Long replyToMessageId;
+
     public static ChatMessage toEntity(ChatMessageReqDto dto, User sender, ChatRoom chatRoom) {
         return ChatMessage.builder()
                 .chatRoom(chatRoom)
                 .sender(sender)
                 .content(dto.getContent())
+                .replyToMessageId(dto.getReplyToMessageId())
                 .build();
     }
 

@@ -11,6 +11,7 @@ import com.soongsil.soongpal.chat.dto.LastMessageDto;
 import com.soongsil.soongpal.chat.repository.ChatMessageRepository;
 import com.soongsil.soongpal.chat.repository.ChatRoomRepository;
 import com.soongsil.soongpal.chat.repository.ChatRoomUserRepository;
+import com.soongsil.soongpal.common.exception.ChatErrorCode;
 import com.soongsil.soongpal.common.exception.ChatException;
 import com.soongsil.soongpal.common.exception.UserErrorCode;
 import com.soongsil.soongpal.common.exception.UserException;
@@ -20,6 +21,7 @@ import com.soongsil.soongpal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,7 @@ public class ChatService {
     private final NotificationService notificationService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final SimpMessagingTemplate messagingTemplate;
 
 
     public ChatMessageResDto saveMessage(Long roomId, ChatMessageReqDto dto, Long userId) {
@@ -60,14 +63,48 @@ public class ChatService {
         chatRoomUserRepository.findByChatRoomIdAndUserId(chatRoom.getId(), userId)
                 .orElseThrow(() -> new ChatException(CHAT_ROOM_ACCESS_DENIED));
 
+        ChatMessage replyToMessage = null;
+        if (dto.getReplyToMessageId() != null) {
+            replyToMessage = chatMessageRepository.findById(dto.getReplyToMessageId())
+                    .orElseThrow(() -> new ChatException(ChatErrorCode.REPLY_TARGET_INVALID));
+            if (!replyToMessage.getChatRoom().getId().equals(roomId)) {
+                throw new ChatException(ChatErrorCode.REPLY_TARGET_INVALID);
+            }
+        }
+
         ChatMessage chatMessage = ChatMessageReqDto.toEntity(dto, sender, chatRoom);
         ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
 
         updateLastMessageCache(roomId, dto.getContent(), savedMessage);
 
         sendNotificationToOtherUsers(roomId, userId, sender.getNickName(), dto.getContent());
-        Integer unreadCount = chatRoomUserRepository.countUnreadUsers(roomId, savedMessage.getId());
-        return ChatMessageResDto.from(savedMessage, unreadCount);
+        Integer unreadCount = chatRoomUserRepository.countUnreadUsers(roomId, savedMessage.getId(), userId);
+        return ChatMessageResDto.from(savedMessage, unreadCount, replyToMessage);
+    }
+
+    /**
+     * 메시지 전송 취소(소프트 삭제). 본인이 보낸 메시지만 가능. content는 DB엔 남지만 응답에서는 항상 가려서 내려감.
+     * 이미 연결된 다른 클라이언트가 실시간으로 반영하도록 /topic/{roomId}로 삭제된 메시지를 그대로 재발행함.
+     */
+    public ChatMessageResDto deleteMessage(Long messageId, Long userId) {
+        ChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ChatException(ChatErrorCode.MESSAGE_NOT_FOUND));
+
+        if (!message.getSender().getId().equals(userId)) {
+            throw new ChatException(ChatErrorCode.MESSAGE_DELETE_DENIED);
+        }
+
+        if (!message.isDeleted()) {
+            message.markDeleted();
+        }
+
+        Long roomId = message.getChatRoom().getId();
+        Integer unreadCount = chatRoomUserRepository.countUnreadUsers(roomId, message.getId(), userId);
+        ChatMessageResDto result = ChatMessageResDto.from(message, unreadCount);
+
+        messagingTemplate.convertAndSend("/topic/" + roomId, result);
+
+        return result;
     }
 
     private void updateLastMessageCache(Long roomId, String content, ChatMessage savedMessage) {

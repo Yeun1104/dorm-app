@@ -14,7 +14,10 @@ public enum ChatErrorCode {
     CHAT_ROOM_NOT_JOINED(HttpStatus.BAD_REQUEST, "참가하지 않은 채팅방입니다."),
     CHAT_ROOM_OUT_DENIED(HttpStatus.BAD_REQUEST, "게시글 유저는 채팅방에 나갈 수 없습니다."),
     CHAT_ROOM_DELETE_DENIED(HttpStatus.FORBIDDEN, "채팅방을 삭제할 권한이 없습니다."),
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),
+    MESSAGE_DELETE_DENIED(HttpStatus.FORBIDDEN, "본인이 보낸 메시지만 삭제할 수 있습니다."),
+    REPLY_TARGET_INVALID(HttpStatus.BAD_REQUEST, "같은 채팅방의 메시지에만 답장할 수 있습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;
